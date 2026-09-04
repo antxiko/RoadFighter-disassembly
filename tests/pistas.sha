@@ -1,0 +1,14 @@
+# Huella de las filas que genera tools/pista.py en cada etapa.
+#
+# Las seis se comprobaron contra openMSX con tools/omsx_etapa.tcl el
+# 2026-09-04: 44 pasos por etapa, y el anillo entero -528 bytes- mas todas
+# las variables del generador salieron IDENTICAS a los de la maquina en los
+# 264. Esto congela ese resultado para que una regresion no pase callando.
+#
+# etapa  filas  sha256 de las filas concatenadas
+1  240  679ce1091433e45dada576e3b2cf4e40cbf96c019ca44a12049bd1fccafb75ad
+2  240  72bf411c9dbb88981463537c37ffdc24daa471a1d155533574b1a43b4915a8b1
+3  240  4f7a90247efcabef3e79ccde1ed472a86d075fa987d61a5cd3b1a41b62774710
+4  240  a10b07faa7cb62018eaff4228195017b78ab50d90701f97ecd5798279cd6612f
+5  240  761a9f46db48a6f6e021d3cfee3033e7d6d5025eb9e00174e6f646acd4e7b6cd
+6  240  e5cdb1ae9d7925a9e49cf47fcd659e316c1edcf91f867e79909e5d5335653244

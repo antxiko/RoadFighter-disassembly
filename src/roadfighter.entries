@@ -1,0 +1,90 @@
+# Puntos de entrada de Road Fighter (Konami, RC-730, 1985). ROM de 16 KB en 0x4000.
+#
+# La BIOS lee la cabecera "AB" y llama a INIT tras inicializar la maquina.
+# En el volcado los bytes 0-9 son 41 42 4F 40 00 00 00 00 00 00: declara SOLO
+# INIT, en 0x404F. STATEMENT, DEVICE y TEXT van a cero.
+0x404F   # INIT, declarado en la cabecera del cartucho (bytes 2-3: 4F 40)
+
+# INIT engancha la interrupcion y se queda en un `jr $`: pone un 0xC3 (jp) en
+# H.KEYI (0xFD9A) y la direccion 0x4013 detras -`ld a,0c3h / ld (0fd9ah),a`
+# seguido de `ld hl,04013h / ld (0fd9bh),hl` en 0x4052-0x405C-, deja la pila en
+# 0xE800, borra 0xE000-0xE7FF con un ldir y termina en `ei / jr $` (0x407D).
+# O sea que TODO el juego cuelga de la interrupcion.
+0x4013   # manejador de la interrupcion, enganchado en H.KEYI por INIT (0x4052-0x405C)
+
+# ======================================================================
+# EL DESPACHADOR: `add a,a / pop hl / call 0x403B / ld e,(hl) / inc hl /
+#                  ld d,(hl) / ex de,hl / jp (hl)`
+# ======================================================================
+#
+# La rutina de 0x4045 es el reparto por indice del cartucho, y la tabla de
+# punteros va PEGADA DETRAS del `call 0x4045` que la usa:
+#
+#     0x4045  add a,a       el indice, por dos
+#     0x4046  pop hl        recupera la direccion de retorno: la tabla misma
+#     0x4047  call 0x403B   HL += A, con acarreo a H
+#     0x404A  ld e,(hl) / inc hl / ld d,(hl)
+#     0x404D  ex de,hl
+#     0x404E  jp (hl)
+#
+# El trazado estatico no puede seguir un `jp (hl)`. La directiva !tabla marca
+# los bytes como datos Y mete cada puntero como punto de entrada.
+
+# El reparto de ESCENAS, llamado desde 0x4096 con A=C=(0xE000), el estado del
+# juego, y B=(0xE001). Son NUEVE: la decima palabra seria 0x1310, que no cae en
+# la ROM -esos dos bytes (10 13) son ya el `djnz` de 0x40AB, o sea el primer
+# destino de la propia tabla-.
+!tabla 0x4099  9   # reparto de escenas, desde 0x4096
+
+# El segundo reparto del mismo despachador, desde 0x5523 con el indice en
+# (0xE043). Son SIETE: la octava palabra seria 0xAFCD, que no cae en la ROM
+# -esos dos bytes son ya el `call 0x58AF` de 0x5534, primer destino de la
+# tabla-. Las dos primeras entradas apuntan al mismo sitio.
+!tabla 0x5526  7   # subestados, desde 0x5523 con el indice en (0xE043)
+
+# ======================================================================
+# LO QUE SE ENTRA POR `push hl / ret`
+# ======================================================================
+# 0x408d hace `ld hl,043c3h / push hl` justo antes de caer en el reparto de
+# escenas: 0x43C3 no es el destino de ningun salto, es la direccion de RETORNO
+# que se deja puesta para que la escena vuelva ahi. Sin declararlo, sus 73
+# bytes -y los 3 del `call 0x49BF` que hace en 0x43ff- se quedan sin trazar.
+0x43C3   # continuacion dejada en la pila por 0x408d (`ld hl,043c3h / push hl`)
+
+# Las otras cuatro tablas del mismo despachador de 0x4045. En todas, la
+# primera entrada apunta justo detras de la tabla, que es donde sigue el
+# codigo, y la primera palabra que NO cae en la ROM marca el final.
+!tabla 0x50c9  6   # desde 0x50c6, con el indice en (0xE043): una rama por etapa
+# La de 0x570C tiene CINCO, no seis: la sexta palabra seria 0x462A, que
+# cae en la ROM pero apunta a un `jr` de dentro del descompresor RLE, y
+# eso no es un destino de paisaje. Sus dos bytes son ya el `ld hl,(0e046h)`
+# de la rutina que 0x5540 llama con `call 05716h` -ver mas abajo-.
+!tabla 0x570c  5   # desde 0x5709, con el indice en el nibble bajo de (0xE07A)
+!tabla 0x6a80  8   # desde 0x6a7d
+!tabla 0x70c9  8   # desde 0x70c6, con 0x728A puesto antes en la pila como retorno
+
+# ======================================================================
+# LA RUTINA ENCABALGADA SOBRE SU PROPIA TABLA
+# ======================================================================
+# 0x5540 hace `call 05716h`, y 0x5716 cae DENTRO de la tabla de paisaje de
+# 0x570C: son sus dos ultimos bytes, la sexta entrada, 0x462A. Konami los usa
+# para dos cosas a la vez: leidos como palabra son ese puntero, y ejecutados
+# son el `ld hl,(0e046h)` con el que arranca la rutina que corre el anillo.
+#
+# Lo que hay ahi es esto, y encaja hasta el ultimo byte con la geometria del
+# anillo que ya estaba medida:
+#
+#     ld hl,(0e046h)      por donde va el anillo
+#     ld bc,0ffeah        veintidos atras: una fila
+#     add hl,bc
+#     ld (0e046h),hl
+#     ld bc,0e170h        0xE186 - 22, o sea antes del principio
+#     and a / sbc hl,bc
+#     jr nz,+6
+#     ld hl,0e380h        y entonces a 0xE380, que mas 22 da 0xE396
+#     ld (0e046h),hl
+#     ld de,(0e046h) / ld hl,0e058h / ld bc,00016h / ldir
+#
+# Sin declararlo, esos 36 bytes se quedan como "datos que no lee nadie" y el
+# listado dice que la fila nueva no entra en el anillo por ninguna parte.
+0x5716   # rutina que corre el anillo, encabalgada sobre la tabla de 0x570c

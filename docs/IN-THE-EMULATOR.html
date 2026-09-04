@@ -1,0 +1,121 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>In the emulator — Road Fighter (Konami, 1985)</title>
+<style>
+:root{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;--linea:#23262e;
+  --rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
+@media (prefers-color-scheme:light){:root{--tinta:#191a1e;--suave:#5a5d66;--fondo:#e9e7e1;
+  --panel:#f7f6f2;--linea:#d0cdc5;--rojo:#b23f34;--cyan:#1c6b7c;--verde:#2b7734;--oro:#8a7420}}
+:root[data-theme="dark"]{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;
+  --linea:#23262e;--rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
+:root[data-theme="light"]{--tinta:#191a1e;--suave:#5a5d66;--fondo:#e9e7e1;--panel:#f7f6f2;
+  --linea:#d0cdc5;--rojo:#b23f34;--cyan:#1c6b7c;--verde:#2b7734;--oro:#8a7420}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--tinta);padding:0 1.25rem 6rem;
+  font:15px/1.7 ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+.w{max-width:1120px;margin:0 auto}
+.n{max-width:68ch}
+h1,h2,h3,h4{font-weight:400;text-wrap:balance}
+a{color:var(--cyan)}
+img{image-rendering:pixelated;max-width:100%;height:auto;display:block}
+header.top{display:flex;flex-direction:column;align-items:center;gap:1.5rem;
+  padding:4rem 0 2rem;text-align:center}
+header.top img{width:min(100%,642px)}
+.claim{max-width:60ch;color:var(--suave);font-size:1.05rem}
+.claim b{color:var(--tinta);font-weight:400}
+.ficha{display:flex;flex-wrap:wrap;justify-content:center;gap:0 1.5rem;width:100%;
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--suave);
+  border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);padding:.85rem 0}
+.ficha b{color:var(--rojo);font-weight:400}
+nav{display:flex;flex-wrap:wrap;gap:1.25rem;justify-content:center;padding:1.25rem 0;
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+nav a{color:var(--suave);text-decoration:none;border-bottom:1px solid transparent}
+nav a:hover,nav a:focus{color:var(--tinta);border-bottom-color:var(--rojo)}
+nav.docs{border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);
+  margin-bottom:1rem}
+section{margin-top:4.5rem;scroll-margin-top:1rem}
+section>h2{font-size:1rem;letter-spacing:.1em;text-transform:uppercase;
+  border-left:3px solid var(--rojo);padding-left:.9rem;margin:0 0 1.5rem}
+.cifras{display:grid;gap:1px;background:var(--linea);border:1px solid var(--linea);
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.cifra{background:var(--panel);padding:1.1rem}
+.cifra b{display:block;font-size:1.7rem;color:var(--oro);font-weight:400;
+  font-variant-numeric:tabular-nums;line-height:1.2}
+.cifra span{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--suave)}
+.hall{border-top:1px solid var(--linea);padding-top:1.75rem;margin-top:2.5rem}
+.hall:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.hall h3{margin:0 0 .75rem;font-size:1.15rem;color:var(--rojo)}
+.hall h4{color:var(--oro);margin:1.5rem 0 .5rem;font-size:.95rem}
+.hall p{margin:0 0 1rem}
+pre.asm{background:var(--panel);border-left:2px solid var(--verde);margin:1.25rem 0;
+  padding:1rem 1.1rem;overflow-x:auto;font-size:13px;line-height:1.6;color:var(--tinta)}
+.par{display:grid;gap:1.25rem;grid-template-columns:1fr}
+@media(min-width:820px){.par{grid-template-columns:1fr 1fr}}
+.par figure{margin:0}
+table{border-collapse:collapse;width:100%;margin:1.25rem 0;font-size:13px;display:block;
+  overflow-x:auto}
+th,td{text-align:left;padding:.5rem .75rem;border-bottom:1px solid var(--linea)}
+th{color:var(--suave);font-weight:400;font-size:11px;letter-spacing:.07em;text-transform:uppercase}
+td.num{font-variant-numeric:tabular-nums;color:var(--oro)}
+.nivel{margin-top:2rem}
+.nivel h3{margin:0 0 .9rem;font-size:.95rem;letter-spacing:.06em;text-transform:uppercase}
+.nivel em{color:var(--cyan);font-style:normal}
+.sep{color:var(--suave);margin:0 .6rem}
+.rejilla{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.rejilla figure{margin:0;background:var(--panel);box-shadow:0 0 0 1px var(--linea)}
+.rejilla figcaption{display:flex;justify-content:space-between;padding:.45rem .65rem;
+  font-size:11px;color:var(--suave);border-top:1px solid var(--linea)}
+.dir{font-variant-numeric:tabular-nums;color:var(--verde)}
+footer{margin-top:5rem;padding-top:1.5rem;border-top:1px solid var(--linea);
+  color:var(--suave);font-size:12px}
+
+/* Aviso de trabajo en curso: tiene que verse antes que las cifras, porque un
+   100% mal leido hace mas dano que no ponerlo. */
+.aviso{background:#3a2a10;border-left:3px solid var(--oro);margin:1.5rem auto;
+  padding:1rem 1.2rem;max-width:900px;border-radius:4px}
+.aviso p{margin:0;color:var(--tinta);font-size:15px;line-height:1.65}
+.galeria{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:1.5rem;margin:1.5rem 0}
+.galeria figure{margin:0}
+.galeria img{width:100%;height:auto;image-rendering:pixelated;
+  border:1px solid var(--linea);border-radius:3px}
+.galeria figcaption{color:var(--suave);font-size:13px;margin-top:.5rem}
+audio{display:block;width:100%;max-width:640px;margin:.75rem 0 1.5rem}
+</style>
+<div class="w"><nav class="top"><a href="index.html">Home</a><a href="GETTING-STARTED.html">Start</a><a href="THE-GAME.html">The game</a><a href="THE-CARTRIDGE.html">The cartridge</a><a href="THE-CODE.html">The code</a><a href="FINDINGS.html">Findings</a><a href="IN-THE-EMULATOR.html" style=color:var(--tinta)>In the emulator</a><a href="OPEN-QUESTIONS.html">Open questions</a><a href="es/EN-EL-EMULADOR.html" style="margin-left:auto;color:var(--oro)">Castellano</a></nav>
+<h1 id="in-the-emulator">In the emulator</h1>
+<p>Looking at a picture is not enough to call it right. What settles it is dumping the machine&#x27;s memory and comparing it, byte for byte, against what the notes claim. Everything this site says about what the cartridge does while running is measured that way.</p>
+<h2 id="the-scripts">The scripts</h2>
+<p><code>tools/</code> holds four openMSX scripts. None of them sets a breakpoint except the one that needs to: the rest work off emulated time, which is the only thing that does not choke the emulator.</p>
+<pre><code>tools/omsx_vram.tcl       dumps the 16 KB of VRAM and the VDP registers
+tools/omsx_coche.tcl      records the car&#x27;s motion, frame by frame
+tools/omsx_carretera.tcl  dumps the road generator&#x27;s state
+tools/omsx_etapa.tcl      the same, forcing which stage is played</code></pre>
+<p>Run them like this:</p>
+<pre><code>&quot;C:/Program Files/openMSX/openmsx.exe&quot; -machine Philips_VG_8020 \
+    -cart roadfighter.rom -script tools/omsx_vram.tcl</code></pre>
+<h2 id="the-graphics-against-vram">The graphics, against VRAM</h2>
+<p><code>tools/graficos.py</code> rebuilds the screens by running the cartridge&#x27;s own steps in Python: the decompressor, the sign interpreter, the mirrors and the patch paster. Then it is compared against what the VDP actually holds.</p>
+<pre><code>TITLE SCREEN     colour, sprites, pattern and names: 0 differences in all four
+GAME SCREEN      colour 0/6144   sprites 0/2048   pattern 0/6144
+                 names 2/528</code></pre>
+<p>The two cells that do not match are the <b>finish arch</b>, row 4, columns 6 and 7, which is animated: it alternates 0x46/0x47 with 0x48/0x49. So the two that fail, fail because they have to.</p>
+<h2 id="the-road-step-by-step">The road, step by step</h2>
+<p>This is the check that costs the most and is worth the most. The road is procedural, so comparing a lone dump says nothing: there is no way to know where in the script it was.</p>
+<p>What does work is this. <code>tools/omsx_carretera.tcl</code> records the <b>entire</b> state of the generator -the variables from 0xE040 to 0xE0C0 and the 528-byte ring- on consecutive frames. Then, in Python, the state from frame N is loaded, <b>one step</b> of the rebuilt engine is run, and the result is compared against frame N+1.</p>
+<p>The result, with each of the six stages forced in turn:</p>
+<table><tr><th>stage</th><th>steps compared</th><th>identical</th></tr><tr><td>1</td><td>44</td><td><b>44</b></td></tr><tr><td>2</td><td>44</td><td><b>44</b></td></tr><tr><td>3</td><td>44</td><td><b>44</b></td></tr><tr><td>4</td><td>44</td><td><b>44</b></td></tr><tr><td>5</td><td>44</td><td><b>44</b></td></tr><tr><td>6</td><td>43</td><td><b>43</b></td></tr></table>
+<p>Identical means the entire ring, all 528 bytes, and every generator variable. Across the 263 steps, not one difference.</p>
+<p>That check turned up three misreadings that only show this way: that the routine at 0x5784 begins with an <code>ldi</code> of its own, that the bridge&#x27;s <code>ldir</code> overlaps itself and drags seven cells rather than six, and that the alternation between the two scripts was the wrong way round.</p>
+<h2 id="forcing-a-stage">Forcing a stage</h2>
+<p>The attract mode picks the stage using the R register, and on a clean openMSX boot the draw always comes out the same: stage 2. To see the other five it has to be forced, and <b>where matters</b>.</p>
+<p><code>tools/omsx_etapa.tcl</code> puts a breakpoint at 0x504C, the first instruction of <code>prepara_la_etapa</code>, and writes (0xE043) <b>before</b> the routine builds anything. That way the scenery, the scripts and the lists are all chosen for the forced stage and the state stays coherent.</p>
+<p>Forcing it mid-game does not work: the scenery stays as the previous stage&#x27;s and the screen fills with garbage. Reading the segment plan does still work -it depends only on (0xE043) and the pointer- but the captures do not.</p>
+<h2 id="the-car">The car</h2>
+<p><code>tools/omsx_coche.tcl</code> records, nine hundred times, the car&#x27;s Y alongside the accelerator and the speed. Three things come out of it:</p>
+<ul><li><b>(0xE04C) is the car sprite&#x27;s Y</b>: it matched the one the VDP held in the attribute table across all 900 samples, without exception.</li><li>The code&#x27;s caps are genuinely reached: the Y locks at 0x9A and the speed at 0xD7.</li><li>The dead band of speed at 0x6C93 holds in 57 of the 58 comparable frames.</li></ul>
+<h2 id="how-to-play-it">How to play it</h2>
+<p>Any MSX1 emulator will do. With openMSX:</p>
+<pre><code>openmsx -machine Philips_VG_8020 -cart roadfighter.rom</code></pre>
+<p>And to see the other build, the same command with <code>roadfighter_dificil.rom</code>. The difference is in stage 5, and it is one segment.</p>
+<footer><p><em>Road Fighter</em> was published by Konami for the MSX in 1985; its catalogue number is RC-730 and it is 16 KB. All rights in the game remain with their holders. This is preservation, study and documentation work, and the cartridge image is not distributed.</p></footer></div>

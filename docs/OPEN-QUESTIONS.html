@@ -1,0 +1,107 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Open questions — Road Fighter (Konami, 1985)</title>
+<style>
+:root{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;--linea:#23262e;
+  --rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
+@media (prefers-color-scheme:light){:root{--tinta:#191a1e;--suave:#5a5d66;--fondo:#e9e7e1;
+  --panel:#f7f6f2;--linea:#d0cdc5;--rojo:#b23f34;--cyan:#1c6b7c;--verde:#2b7734;--oro:#8a7420}}
+:root[data-theme="dark"]{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;
+  --linea:#23262e;--rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
+:root[data-theme="light"]{--tinta:#191a1e;--suave:#5a5d66;--fondo:#e9e7e1;--panel:#f7f6f2;
+  --linea:#d0cdc5;--rojo:#b23f34;--cyan:#1c6b7c;--verde:#2b7734;--oro:#8a7420}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--tinta);padding:0 1.25rem 6rem;
+  font:15px/1.7 ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+.w{max-width:1120px;margin:0 auto}
+.n{max-width:68ch}
+h1,h2,h3,h4{font-weight:400;text-wrap:balance}
+a{color:var(--cyan)}
+img{image-rendering:pixelated;max-width:100%;height:auto;display:block}
+header.top{display:flex;flex-direction:column;align-items:center;gap:1.5rem;
+  padding:4rem 0 2rem;text-align:center}
+header.top img{width:min(100%,642px)}
+.claim{max-width:60ch;color:var(--suave);font-size:1.05rem}
+.claim b{color:var(--tinta);font-weight:400}
+.ficha{display:flex;flex-wrap:wrap;justify-content:center;gap:0 1.5rem;width:100%;
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--suave);
+  border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);padding:.85rem 0}
+.ficha b{color:var(--rojo);font-weight:400}
+nav{display:flex;flex-wrap:wrap;gap:1.25rem;justify-content:center;padding:1.25rem 0;
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+nav a{color:var(--suave);text-decoration:none;border-bottom:1px solid transparent}
+nav a:hover,nav a:focus{color:var(--tinta);border-bottom-color:var(--rojo)}
+nav.docs{border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);
+  margin-bottom:1rem}
+section{margin-top:4.5rem;scroll-margin-top:1rem}
+section>h2{font-size:1rem;letter-spacing:.1em;text-transform:uppercase;
+  border-left:3px solid var(--rojo);padding-left:.9rem;margin:0 0 1.5rem}
+.cifras{display:grid;gap:1px;background:var(--linea);border:1px solid var(--linea);
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.cifra{background:var(--panel);padding:1.1rem}
+.cifra b{display:block;font-size:1.7rem;color:var(--oro);font-weight:400;
+  font-variant-numeric:tabular-nums;line-height:1.2}
+.cifra span{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--suave)}
+.hall{border-top:1px solid var(--linea);padding-top:1.75rem;margin-top:2.5rem}
+.hall:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.hall h3{margin:0 0 .75rem;font-size:1.15rem;color:var(--rojo)}
+.hall h4{color:var(--oro);margin:1.5rem 0 .5rem;font-size:.95rem}
+.hall p{margin:0 0 1rem}
+pre.asm{background:var(--panel);border-left:2px solid var(--verde);margin:1.25rem 0;
+  padding:1rem 1.1rem;overflow-x:auto;font-size:13px;line-height:1.6;color:var(--tinta)}
+.par{display:grid;gap:1.25rem;grid-template-columns:1fr}
+@media(min-width:820px){.par{grid-template-columns:1fr 1fr}}
+.par figure{margin:0}
+table{border-collapse:collapse;width:100%;margin:1.25rem 0;font-size:13px;display:block;
+  overflow-x:auto}
+th,td{text-align:left;padding:.5rem .75rem;border-bottom:1px solid var(--linea)}
+th{color:var(--suave);font-weight:400;font-size:11px;letter-spacing:.07em;text-transform:uppercase}
+td.num{font-variant-numeric:tabular-nums;color:var(--oro)}
+.nivel{margin-top:2rem}
+.nivel h3{margin:0 0 .9rem;font-size:.95rem;letter-spacing:.06em;text-transform:uppercase}
+.nivel em{color:var(--cyan);font-style:normal}
+.sep{color:var(--suave);margin:0 .6rem}
+.rejilla{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.rejilla figure{margin:0;background:var(--panel);box-shadow:0 0 0 1px var(--linea)}
+.rejilla figcaption{display:flex;justify-content:space-between;padding:.45rem .65rem;
+  font-size:11px;color:var(--suave);border-top:1px solid var(--linea)}
+.dir{font-variant-numeric:tabular-nums;color:var(--verde)}
+footer{margin-top:5rem;padding-top:1.5rem;border-top:1px solid var(--linea);
+  color:var(--suave);font-size:12px}
+
+/* Aviso de trabajo en curso: tiene que verse antes que las cifras, porque un
+   100% mal leido hace mas dano que no ponerlo. */
+.aviso{background:#3a2a10;border-left:3px solid var(--oro);margin:1.5rem auto;
+  padding:1rem 1.2rem;max-width:900px;border-radius:4px}
+.aviso p{margin:0;color:var(--tinta);font-size:15px;line-height:1.65}
+.galeria{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:1.5rem;margin:1.5rem 0}
+.galeria figure{margin:0}
+.galeria img{width:100%;height:auto;image-rendering:pixelated;
+  border:1px solid var(--linea);border-radius:3px}
+.galeria figcaption{color:var(--suave);font-size:13px;margin-top:.5rem}
+audio{display:block;width:100%;max-width:640px;margin:.75rem 0 1.5rem}
+</style>
+<div class="w"><nav class="top"><a href="index.html">Home</a><a href="GETTING-STARTED.html">Start</a><a href="THE-GAME.html">The game</a><a href="THE-CARTRIDGE.html">The cartridge</a><a href="THE-CODE.html">The code</a><a href="FINDINGS.html">Findings</a><a href="IN-THE-EMULATOR.html">In the emulator</a><a href="OPEN-QUESTIONS.html" style=color:var(--tinta)>Open questions</a><a href="es/PREGUNTAS-ABIERTAS.html" style="margin-left:auto;color:var(--oro)">Castellano</a></nav>
+<h1 id="open-questions">Open questions</h1>
+<p>The cartridge is 100 % explained -not one byte unaccounted for- and it reassembles byte for byte. That does not mean there is nothing left to find out. These are the loose ends, and they are here rather than glossed over on some other page.</p>
+<h2 id="which-of-the-two-builds-plays-harder">Which of the two builds plays harder</h2>
+<p>It is the obvious question and it is not answered.</p>
+<p>What <b>is</b> measured: the two differ by a single byte, 0x53CB, which is the fifteenth segment of the stage 5 row in the plan at 0x537D. With 0x05 that stage plays fifteen segments per cycle and with 0xFF, fourteen. The one that vanishes is segment 5, whose record is <code>00 04 18 08 08 28</code>.</p>
+<p>What is <b>not</b> measured: whether removing that segment makes the stage easier or harder. One segment fewer per cycle may mean fewer cars to run into, or it may mean the cycle repeats sooner and the remaining ones come faster. Without playing it, or without counting the objects that actually spawn over a full cycle, there is nothing to say.</p>
+<p>The &quot;Easy&quot; and &quot;Hard&quot; names the two dumps circulate under come from the GoodMSX catalogue, not from the ROM, and count as evidence of nothing here.</p>
+<h2 id="whether-scenery-mode-5-is-ever-used">Whether scenery mode 5 is ever used</h2>
+<p>The scenery pointer table at 0x570C has five entries, and the sixth word is already code. The index comes from the low nibble of (0xE07A), so a mode with a low nibble of 5 would run off the end of the table and jump to 0x462A, inside the decompressor.</p>
+<p>That the cartridge uses those two bytes as code is certain: there is an explicit <code>call 05716h</code>, and declaring them that way still gives back the ROM byte for byte. What is not established is whether any scenery script ever asks for mode 5. That would mean walking the scripts from their real starting points, and not all of those starting points are identified.</p>
+<h2 id="where-the-scenery-scripts-start">Where the scenery scripts start</h2>
+<p>The [mode, count] pairs from 0x78C4 to 0x7C23 and from 0x7E60 to 0x7FE4 are the scenery scripts, and the table at 0x5161 points into them. The starts actually used are located -0x78C4 and 0x78E5, 0x7AAA, 0x7BAA, 0x7ACD, 0x7960, 0x7E60, 0x7E83, 0x7EA8, 0x7F6B and 0x7ED1- but <b>the end of each one is not marked</b>: 0x585F reads the two bytes without checking anything, and what stops it is the stage running out.</p>
+<p>Which means there is no telling how many pairs each script has without running it with a whole stage in front of it.</p>
+<h2 id="why-the-car-moves-down-under-acceleration">Why the car moves down under acceleration</h2>
+<p>It is measured that the sprite&#x27;s Y grows while the accelerator is held -that is, the car moves down the screen- until it locks at 0x9A, and that it shrinks without it. That is a fact.</p>
+<p>What is not known is whether that answers to a specific design idea or is just the cheapest way to convey speed. No speculation here.</p>
+<h2 id="the-three-overlapping-blocks">The three overlapping blocks</h2>
+<p>It is measured that three compressed blocks close beyond their range, eating the next block whole or in part. What is not known is whether that is deliberate -compression exploiting the tail- or the result of whatever tool Konami generated them with happening to leave them that way.</p>
+<p>All three close on their own 0x00 and all three match the emulator&#x27;s VRAM, so the reading is not in doubt. The intent is.</p>
+<h2 id="the-trace-s-blind-spot">The trace&#x27;s blind spot</h2>
+<p>There is one left, and it is declared: the <code>JP (HL)</code> at 0x404E, the generic dispatcher. It cannot be resolved by following jumps because its destination comes from a different table every time. All six tables are declared by hand in the <code>.entries</code>, each with its justification, and the budget closes at 16,384 bytes with no unexplained region.</p>
+<footer><p><em>Road Fighter</em> was published by Konami for the MSX in 1985; its catalogue number is RC-730 and it is 16 KB. All rights in the game remain with their holders. This is preservation, study and documentation work, and the cartridge image is not distributed.</p></footer></div>

@@ -1,0 +1,2973 @@
+# Notas de Road Fighter (Konami, RC-730, 1985), ancladas a direccion.
+#
+# Convenio: `D ini fin nombre  explicacion` declara un bloque de datos, y
+# `F ini anchura` dice como se estructura para que el listado lo escriba con
+# la forma que tiene (w = palabras de 16 bits). Los rangos llevan el extremo
+# derecho EXCLUSIVO, igual que los emite z80trace.
+#
+# Toda cifra de aqui esta MEDIDA -ejecutando el descompresor, el pegador de
+# retales o el interprete de rotulos del propio cartucho, o leyendo quien
+# carga el bloque-, no estimada a ojo.
+
+D 0x76ec 0x7755 rectangulo_de_nombres  21 filas de 5 tiles que 0x7467 escribe en la tabla de nombres desde 0x382b, con L_4575 (`ld bc,01505h`), saltando 0x20 por fila
+F 0x76ec 5
+
+# ======================================================================
+# LA CABECERA
+# ======================================================================
+D 0x4000 0x4010 cabecera_del_cartucho  "AB" y la direccion de INIT (0x404F); STATEMENT, DEVICE y TEXT a cero, y los seis bytes reservados tambien
+F 0x4000 w
+
+# ======================================================================
+# EL REPARTO DE ESCENAS
+# ======================================================================
+# La tabla va PEGADA detras del `call L_4045` de 0x4096, que es el despachador
+# `add a,a / pop hl / call L_403B / ld e,(hl) / inc hl / ld d,(hl) / ex de,hl
+# / jp (hl)`: el `pop hl` recupera su propia direccion de retorno, que es la
+# tabla. El indice es (0xE000), el estado del juego. Son NUEVE: la decima
+# palabra seria 0x1310, que no cae en la ROM -esos dos bytes son ya el `djnz`
+# de 0x40AB, el primer destino de la propia tabla-.
+D 0x4099 0x40ab tabla_de_escenas  9 entradas, indexada por (0xE000); pegada detras del call de 0x4096
+F 0x4099 w
+
+# ======================================================================
+# LOS ROTULOS: guiones del interprete L_45F0
+# ======================================================================
+# L_45F0 es un interprete: [destino en VRAM, word] [indices de patron...], con
+# 0xFE para saltar a otro destino y 0xFF para terminar. L_4607 es la misma
+# rutina con C=0, que escribe ceros: borra el rotulo reutilizando el guion.
+#
+# Los limites NO estan estimados: los da tools/guiones.py ejecutando ese mismo
+# interprete desde cada arranque, y cada bloque cierra en su propio 0xFF.
+#
+# La fuente del cartucho esta ordenada como el ASCII a partir del espacio, o
+# sea que el indice de patron es el codigo ASCII menos 0x20. Se ve en el
+# contenido: "+/.!-)" en 0x7f1d es "KONAMI" y "34!24" en 0x7895 es "START".
+D 0x470d 0x471f guion_marcadores  "HISCORE" en 0x3817 y "SCORE" en 0x3877, los dos rotulos fijos del marcador
+D 0x471f 0x472a guion_stage  "STAGE" en 0x3969, el rotulo que anuncia la etapa; el numero lo escribe aparte el marcador
+D 0x472a 0x4751 guion_titulo  ":KONAMI 1985", "PLAY SELECT" y "LEVEL A" de la pantalla de presentacion, en tres destinos
+D 0x4751 0x475b guion_nivel_b  "LEVEL B" en 0x3a4d, la segunda opcion del menu
+D 0x475e 0x476a guion_game_over  "GAME OVER" en 0x3969
+D 0x476a 0x4773 guion_marca  los patrones 0x5a..0x5f en 0x3af8: el simbolo de la casa, no letras
+
+# ======================================================================
+# EL DESCOMPRESOR L_4611 Y SUS BLOQUES
+# ======================================================================
+# El cartucho comprime sus graficos con un RLE de un byte de mandato que
+# escribe DIRECTAMENTE en la VRAM (`out (c),a` sobre el puerto de datos del
+# VDP), no en memoria:
+#
+#     0x00           cierra el bloque
+#     0x01..0x7F     el byte que sigue, repetido esa cuenta
+#     0x80           los dos bytes que siguen son una direccion de VRAM nueva
+#     0x81..0xFF     copia tal cual los (mandato & 0x7F) bytes que siguen
+#
+# Hay dos puertas: por L_4611 el destino llega en HL, y por L_460B va dentro
+# del propio bloque, en sus dos primeros bytes.
+#
+# Y L_45E0 llama a L_4611 TRES veces sumandole 0x800 a HL: es la geometria de
+# SCREEN 2, que reparte patrones y colores en tres tercios de pantalla. Por
+# eso un solo bloque llena los tres.
+#
+# Los limites los mide tools/rle.py ejecutando ese mismo descompresor.
+D 0x46fc 0x470d rle_46fc  a la VRAM 0x394a y 0x396c (dos tramos, mandato 0x80); 20 bytes de nombres. Lo carga 0x40b9
+D 0x478a 0x489a rle_fuente_patron  272 bytes -> 344 de PATRON en 0x2080 (43 tiles). Lo carga 0x477c, y justo detras 0x477f llena de 0xF0 el COLOR de 0x0080: letras blancas sobre transparente
+D 0x490f 0x49a6 rle_marcador_patron  151 bytes -> 216 de PATRON en 0x2200 (27 tiles). Lo carga 0x48cf, y 0x48d2 llena de 0xF0 el COLOR de 0x0200
+D 0x4a25 0x4afc rle_titulo_patron  215 bytes -> 264 de PATRON en 0x2600 (33 tiles). Lo carga 0x49b7
+D 0x5a71 0x5b95 rle_sprites_1800  292 bytes -> los 320 primeros de la tabla de PATRONES DE SPRITE (0x1800, que fija R6=0x03): diez patrones de 16x16. El destino va dentro del bloque. Lo carga 0x6931
+D 0x5b95 0x5dec rle_sprites_1a00  599 bytes -> 800 de PATRONES DE SPRITE en 0x1a00: veinticinco patrones de 16x16. El destino va dentro del bloque. Lo carga 0x6942
+D 0x5dec 0x5f45 rle_patron_2200  345 bytes -> los 512 de PATRON de 0x2200 a 0x2400 (64 tiles). Lo carga 0x68b0. OJO: sus ultimos 32 bytes son tambien el arranque del bloque siguiente
+D 0x5f45 0x5fec rle_color_0200  cola del bloque de 0x5f25, que el cartucho carga al COLOR de 0x0200 desde 0x68b9
+D 0x5fec 0x5ff7 rle_patron_2680  11 bytes -> 40 de PATRON en 0x2680. Lo carga 0x68c2
+D 0x5ff7 0x6008 rle_patron_26c8  17 bytes -> 64 de PATRON en 0x26c8. Lo carga 0x68e8
+D 0x6008 0x601d rle_patron_2748  21 bytes -> 80 de PATRON en 0x2748. Lo carga 0x690e
+D 0x601d 0x601f rle_color_0680  5 bytes -> 40 de COLOR en 0x0680. Lo carga 0x68cb. SOLAPE: no cierra en 0x601F sino en 0x6022, o sea que sus tres ultimos bytes son el bloque entero de 0x601F. Solo se declaran aqui los dos que son suyos, para que el presupuesto no los cuente dos veces
+D 0x601f 0x6022 rle_color_06a8  3 bytes -> 32 de COLOR en 0x06a8. Lo carga 0x68df
+D 0x6022 0x602d rle_color_06c8  11 bytes -> 64 de COLOR; lo cargan 0x68f1 (a 0x06c8) y 0x6905 (a 0x0708), el mismo bloque en dos sitios
+D 0x602d 0x6031 rle_color_0748  17 bytes -> 88 de COLOR en 0x0748. Lo carga 0x6917. SOLAPE: no cierra en 0x6031 sino en 0x603E, o sea que sus trece ultimos bytes son el bloque entero de 0x6031. Solo se declaran aqui los cuatro que son suyos, para que el presupuesto no los cuente dos veces
+D 0x6031 0x603e rle_color_0798  13 bytes -> 64 de COLOR en 0x0798. Lo carga 0x692b
+
+# ----------------------------------------------------------------------
+# EL DECORADO DE CADA ETAPA
+# ----------------------------------------------------------------------
+# L_6A30 es el cargador de decorado, y lo dice todo en cuatro instrucciones:
+# `ld a,(0e043h) / dec a / add a,a / add a,a / ld hl,06a51h / call L_403B`.
+# O sea 0x6A51 + 4*(etapa-1): DOS punteros por etapa, el primero al PATRON de
+# 0x2400 y el segundo al COLOR de 0x0400.
+#
+# Las etapas 4 y 5 comparten decorado -las dos apuntan a 0x6645 y 0x6737-, asi
+# que de seis etapas solo hay CINCO decorados distintos.
+#
+# Medido con tools/rle.py: los doce bloques cierran seguidos y llenan
+# 0x603E..0x68A9 sin dejar un byte suelto.
+D 0x603e 0x61c8 decorado_1_patron  394 bytes -> 496 de PATRON en 0x2400. Etapa 1
+D 0x61c8 0x6279 decorado_1_color  177 bytes -> 496 de COLOR en 0x0400. Etapa 1
+D 0x6279 0x63ac decorado_2_patron  307 bytes -> 392 de PATRON en 0x2400. Etapa 2
+D 0x63ac 0x6431 rle_patron_2588  133 bytes -> 192 de PATRON en 0x2588. Lo carga 0x6992, solo en la etapa 2
+D 0x6431 0x64ca decorado_2_color  153 bytes -> 584 de COLOR en 0x0400. Etapa 2
+D 0x64ca 0x65d7 decorado_3_patron  269 bytes -> 352 de PATRON en 0x2400. Etapa 3
+D 0x65d7 0x6645 decorado_3_color  110 bytes -> 352 de COLOR en 0x0400. Etapa 3
+D 0x6645 0x6697 decorado_45_patron  82 bytes -> 104 de PATRON en 0x2400. Etapas 4 y 5, que comparten decorado
+D 0x6697 0x6737 rle_patron_24d0  160 bytes -> 184 de PATRON en 0x24d0. Lo carga 0x69de, en las etapas 4 y 5
+D 0x6737 0x675e decorado_45_color  39 bytes -> 104 de COLOR en 0x0400. Etapas 4 y 5
+D 0x675e 0x67c2 rle_color_04d0  100 bytes -> 184 de COLOR en 0x04d0. Lo carga 0x69e7
+D 0x67c2 0x67d5 rle_color_0588  19 bytes -> 192 de COLOR en 0x0588. Lo carga 0x69af
+D 0x67d5 0x6885 decorado_6_patron  176 bytes -> 200 de PATRON en 0x2400. Etapa 6
+D 0x6885 0x68aa decorado_6_color  37 bytes -> 200 de COLOR en 0x0400. Etapa 6
+D 0x6a51 0x6a69 tabla_de_decorados  seis registros de cuatro bytes, dos punteros por etapa; la indexa 0x6a36
+F 0x6a51 4
+D 0x6a69 0x6a70 color_del_decorado  un byte por etapa, indexado SIN restar uno (0x6a09: `ld a,(0e043h) / ld hl,06a69h`), asi que el primero no se usa. L_6A18 lo mete en el nibble alto de los 128 bytes de color de 0x0748, dejando el bajo: verde, amarillo, transparente, rojo oscuro, rojo claro y blanco
+D 0x74bc 0x7638 rle_patron_2400_c  380 bytes -> 408 de PATRON en 0x2400 (51 tiles). Lo carga 0x7452
+D 0x7638 0x76ec rle_color_0400_c  180 bytes -> 408 de COLOR en 0x0400. Lo carga 0x745b
+
+# ======================================================================
+# EL PLAN DE CADA ETAPA
+# ======================================================================
+# 0x509c y 0x7036 hacen lo mismo: `ld a,(0e043h) / dec a / add hl,hl x4 /
+# ld de,0537dh / add hl,de`. O sea 0x537D + 16*(etapa-1): SEIS filas de
+# DIECISEIS bytes, una por etapa.
+#
+# Cada fila es una lista ciclica de tramos de carretera cerrada por un 0xFF,
+# y rellena con 0xFF hasta los 16. Cuando 0x7027 lee el 0xFF vuelve al
+# principio de SU fila (0x702b-0x703a), asi que la lista se repite sin fin
+# mientras dure la etapa.
+#
+# Y son SEIS etapas porque 0x4394 lo dice: `inc (hl) / cp 007h`, y al llegar
+# a 7 la deja en 1 y sube el contador de vueltas de 0xE042.
+D 0x5311 0x536b tabla_de_tramos  15 registros de 6 bytes, indexados por el valor de la lista de la etapa (0x704e: 0x5311 + 6*(v-1)); cada registro arma DOS objetos de 16 bytes en 0xE0C3 y 0xE0D3
+F 0x5311 6
+D 0x536b 0x537d tabla_536b  18 bytes; la carga 0x6ffe
+D 0x537d 0x53dd plan_de_las_etapas  SEIS filas de 16 bytes, una por etapa; lista ciclica de tramos cerrada en 0xFF. **La UNICA diferencia entre las dos compilaciones esta en 0x53CB**, el decimoquinto tramo de la etapa 5
+F 0x537d 16
+
+# ======================================================================
+# LOS SPRITES Y EL FINAL DE ETAPA
+# ======================================================================
+D 0x74b6 0x74bc altura_del_coche_por_etapa  seis bytes, uno por etapa: 0x8B 0x71 0x54 0x3A 0x1B 0x00. Es la Y en la que el coche se planta al rematar la etapa: 0x747D, el paso 2 de la escena de fin, baja (0xE04C) de uno en uno -o sea, sube el coche por la pantalla- hasta igualar el byte de esa etapa. (0xE04C) es la Y del sprite, MEDIDA contra la VRAM del emulador, no una cuenta atras
+
+# ======================================================================
+# LOS RETALES DE PAISAJE
+# ======================================================================
+# L_783F pega rectangulos de tiles en un buffer de RAM de VEINTIDOS columnas
+# (`ld a,016h / sub c`), y con A repite el mismo retal hacia abajo. El formato
+# es [alto][ancho][tiles...], y los limites los mide tools/retales.py.
+#
+# OJO con las medidas de aqui abajo: van escritas ANCHO x ALTO, que es como se
+# lee un rectangulo, y NO en el orden en el que los dos bytes estan guardados
+# en la ROM, que es el contrario. El test que las comprueba tuvo que aprender
+# a darles la vuelta.
+D 0x785b 0x7875 retal_meta  4 x 6, el arco de la meta; lo carga 0x780f
+D 0x7875 0x7893 retal_calzada  7 x 4, la calzada con su linea central; lo carga 0x77d5
+D 0x7893 0x789f retal_start  5 x 2, el rotulo "START" sobre la calzada; lo carga 0x782c
+D 0x789f 0x78a5 retal_789f  4 x 1, una tira de cuatro tiles de una sola fila; lo carga 0x7818
+D 0x78a5 0x78ac retal_78a5  5 x 1; lo carga 0x77ee
+D 0x78ac 0x78b2 retal_78ac  2 x 2; lo carga 0x7834
+D 0x78b2 0x78be retal_arcen  2 x 5, el arcen con sus postes; lo carga 0x77df
+D 0x78be 0x78c1 retal_78be  1 x 1; lo carga 0x7804
+
+# ======================================================================
+# TABLAS SUELTAS, CADA UNA CON QUIEN LA LEE
+# ======================================================================
+D 0x4112 0x411a colores_del_logotipo  cuatro PARES de color para el rotulo grande de la presentacion; 0x40ee los indexa con `ld a,(hl) / and 003h / add a,a` sobre el contador de 0xE004, y 0x40fa y 0x4106 los meten en el color de 0x0600 (0xB0 bytes) y de 0x06b0 (0x58). Por eso el rotulo late
+F 0x4112 2
+D 0x4241 0x424a tabla_4241  nueve bytes; los indexa 0x422a con `ld hl,04241h / call L_403B / ld a,(hl)`
+D 0x452d 0x4535 datos_452d  ocho bytes que 0x4501 sube a la VRAM de cuatro en cuatro (`ld de,0452dh / ld bc,00004h / call L_45A7`)
+D 0x46a9 0x46b1 registros_del_vdp  los OCHO registros del VDP, que escribe el bucle de 0x469f: 02 E2 0E 7F 07 76 03 E4. R3=0x7F y R4=0x07 dejan los COLORES en 0x0000 y los PATRONES en 0x2000, al reves del reparto habitual; R5=0x76 los atributos de sprite en 0x3B00 y R6=0x03 sus patrones en 0x1800
+D 0x475b 0x475e guion_sin_destino  tres bytes de guion SIN su palabra de destino: 0x5045 entra por 0x45f8 (`ld de,0475bh / jp L_45F8`), saltandose la lectura del destino y usando el que ya haya
+D 0x5161 0x5185 guiones_por_etapa  SEIS registros de tres punteros, uno por etapa; los indexa 0x5132 con `ld a,(0e043h) / dec a / add a,a / ld b,a / add a,a / add a,b`, o sea 0x5161 + 6*(etapa-1), y copia los seis bytes a 0xE071. Las etapas 2 y 3 llevan los MISMOS tres punteros
+F 0x5161 w
+D 0x5185 0x5191 plantilla_de_los_tres_sprites  doce bytes que 0x520D copia a 0xE10E: la aguja del cuadro de mandos (Y 0xE0, x 0xD0, patron 0x6C, color 6) y los DOS sprites del coche, los dos en la Y 0x80 y la x 0x52. Cotejado con la copia que el emulador tiene en marcha, byte a byte
+D 0x5191 0x5197 tile_de_fondo_por_etapa  seis bytes, uno por etapa: el tile con el que 0x592A llena la fila nueva antes de que la calzada pinte lo suyo. Lo indexa 0x5092 con (0xE043) menos uno
+D 0x73fc 0x740b tiles_de_la_barra  doce tiles en 0x73fc para la barra vertical de 0x73ba, de tres en tres y subiendo de 0x20 en 0x20, mas los tres de 0x7408 que rellenan el resto
+F 0x73fc 3
+
+# ======================================================================
+# EL ANILLO DE LA CARRETERA
+# ======================================================================
+# El paisaje NO vive en la VRAM: vive en un anillo de RAM de VEINTICUATRO
+# filas por VEINTIDOS columnas, 0xE186..0xE395. L_572E lo vuelca entero a la
+# tabla de nombres empezando en 0x3801 -o sea la columna 1-, fila a fila
+# saltando 0x20, y cuando el puntero llega a 0xE396 lo devuelve a 0xE186
+# (0x5753-0x575D). Las nueve columnas de la derecha no son carretera: son el
+# cuadro de mandos.
+#
+# El paisaje de la SALIDA lo monta 0x77C8: primero llena el anillo entero de
+# hierba (el tile 0xA0, con un `lddr` de 0x225 bytes) y luego pega los ocho
+# retales uno detras de otro, heredando cada llamada el DE que dejo la
+# anterior. Rehecho en tools/graficos.py y COMPROBADO contra la VRAM que
+# vuelca openMSX: 526 de las 528 casillas salen iguales, y las dos que no
+# -fila 4, columnas 6 y 7- son el arco de meta, que esta animado y alterna
+# entre los tiles 0x46/0x47 y 0x48/0x49.
+
+# ======================================================================
+# LAS LISTAS CICLICAS DE LA CALZADA
+# ======================================================================
+# Todas cerradas por 0xFF y todas ciclicas. Los limites los mide
+# tools/listas.py ejecutando el mismo recorrido que el Z80.
+#
+# L_56CC es el mas bonito: `ld b,00ch` y doce veces `sla l / rl h`. De cada
+# palabra -guardada al reves, byte ALTO primero- saca los doce bits de arriba,
+# y cada bit elige uno de dos tiles: 0x80 o 0x0F, y en la ETAPA 3 el 0x9B o el
+# 0x04 (0x56d8: `cp 003h`). O sea que cada palabra es UNA FILA de doce
+# casillas de calzada, y la lista entera es la animacion de la linea
+# discontinua bajando.
+D 0x7c85 0x7c92 lineas_de_la_calzada  seis filas de doce bits: #..#..#..#.. / .#..#..#..#. / vacia / ..#..#..#..# / vacia / vacia. La carga 0x557a, con el puntero en 0xE090
+F 0x7c85 2
+D 0x7fe4 0x7ff1 lineas_de_la_calzada_b  las otras seis filas, mas separadas: ..#...#...#. y #...#...#... entre cuatro vacias. La cargan 0x50d5 y 0x56c3
+F 0x7fe4 2
+D 0x7dc5 0x7e26 columnas_del_arcen  veinticuatro registros de CUATRO bytes que 0x5555 copia a 0xE058, la fila nueva que 0x5732 mete en el anillo. Puntero en 0xE08A
+F 0x7dc5 4
+D 0x7c23 0x7c54 paisaje_a  48 bytes y su 0xFF; el recorrido de 0x5587 retrocede 0x30 al topar con el, asi que el ciclo son exactamente estos 48. Lo carga 0x559d con BC=0x0601
+D 0x7c54 0x7c85 paisaje_b  los otros 48 y su 0xFF; lo carga 0x55a6 con C=0x10, y 0x5594 alterna entre este y el anterior con el bit 0 de (0xE07C)
+D 0x5998 0x59c1 paisaje_de_salida  40 bytes y su 0xFF; es el que 0x515a y 0x5776 ponen en (0xE06F) al empezar
+
+# ======================================================================
+# LA MUSICA
+# ======================================================================
+# 0x4dc5 y 0x4dcb llaman a WRTPSG (0x0093) con el periodo del tono partido en
+# dos registros del PSG. El periodo sale de la tabla de 0x4dd6, que son DOCE
+# bytes -los doce semitonos de una octava- y a la que 0x4dbf le aplica un
+# `add hl,hl` por cada octava que pida el byte 5 de la voz.
+D 0x4dd6 0x4de2 tabla_de_notas  los doce semitonos de una octava; 0x4db0 la indexa y 0x4dc0 la desplaza una octava por cada `add hl,hl`
+D 0x4de2 0x4e1c tabla_de_melodias  29 punteros a las melodias; las tres ultimas entradas apuntan al final (0x5027), o sea que estan vacias
+F 0x4de2 w
+D 0x4e1c 0x4e1d melodia_00  1 bytes; entrada 0 de la tabla de 0x4de2
+D 0x4e1d 0x4e2f melodia_01  18 bytes; entrada 1 de la tabla de 0x4de2
+D 0x4e2f 0x4e47 melodia_02  24 bytes; entrada 2 de la tabla de 0x4de2
+D 0x4e47 0x4e5b melodia_03  20 bytes; entrada 3 de la tabla de 0x4de2
+D 0x4e5b 0x4e71 melodia_04  22 bytes; entrada 4 de la tabla de 0x4de2
+D 0x4e71 0x4e87 melodia_05  22 bytes; entrada 5 de la tabla de 0x4de2
+D 0x4e87 0x4e9d melodia_06  22 bytes; entrada 6 de la tabla de 0x4de2
+D 0x4e9d 0x4eb3 melodia_07  22 bytes; entrada 7 de la tabla de 0x4de2
+D 0x4eb3 0x4ec2 melodia_08  15 bytes; entrada 8 de la tabla de 0x4de2
+D 0x4ec2 0x4ed1 melodia_09  15 bytes; entrada 9 de la tabla de 0x4de2
+D 0x4ed1 0x4ee4 melodia_10  19 bytes; entrada 10 de la tabla de 0x4de2
+D 0x4ee4 0x4ee5 melodia_11  1 bytes; entrada 11 de la tabla de 0x4de2
+D 0x4ee5 0x4eef melodia_12  10 bytes; entrada 12 de la tabla de 0x4de2
+D 0x4eef 0x4ef9 melodia_13  10 bytes; entrada 13 de la tabla de 0x4de2
+D 0x4ef9 0x4f20 melodia_14  39 bytes; entrada 14 de la tabla de 0x4de2
+D 0x4f20 0x4f3d melodia_15  29 bytes; entrada 15 de la tabla de 0x4de2
+D 0x4f3d 0x4f3e melodia_16  1 bytes; entrada 16 de la tabla de 0x4de2
+D 0x4f3e 0x4f5a melodia_17  28 bytes; entrada 17 de la tabla de 0x4de2
+D 0x4f5a 0x4f76 melodia_18  28 bytes; entrada 18 de la tabla de 0x4de2
+D 0x4f76 0x4f8f melodia_19  25 bytes; entrada 19 de la tabla de 0x4de2
+D 0x4f8f 0x4fa9 melodia_20  26 bytes; entrada 20 de la tabla de 0x4de2
+D 0x4fa9 0x4fc3 melodia_21  26 bytes; entrada 21 de la tabla de 0x4de2
+D 0x4fc3 0x4fd4 melodia_22  17 bytes; entrada 22 de la tabla de 0x4de2
+D 0x4fd4 0x4ff0 melodia_23  28 bytes; entrada 23 de la tabla de 0x4de2
+D 0x4ff0 0x500e melodia_24  30 bytes; entrada 24 de la tabla de 0x4de2
+D 0x500e 0x5027 melodia_25  25 bytes; entrada 25 de la tabla de 0x4de2
+
+# ======================================================================
+# EL PAISAJE DE LOS LADOS
+# ======================================================================
+# La cadena entera, leida del codigo:
+#
+#   etapa -> 0x5161 + 6*(etapa-1) -> TRES punteros a guion de paisaje
+#   guion -> pares [modo][cuenta], que 0x585f va sacando de dos en dos
+#   el nibble BAJO del modo -> tabla de punteros de 0x593A -> los tiles
+#   el nibble ALTO del modo -> con 0x58AB, el valor que va a (0xE081)
+#
+# El 0xE07B es la cuenta: 0x576b lo baja cada vez y cuando llega a cero salta
+# a 0x585f, que lee el par siguiente. O sea que cada par dice "este paisaje,
+# durante tantas filas".
+D 0x593a 0x5944 tabla_de_paisajes  cinco punteros a los tiles del paisaje; los indexa 0x587c con el nibble bajo del modo
+F 0x593a w
+D 0x59c1 0x59c3 paisaje_1  entrada 1 de la tabla de 0x593a
+D 0x59c3 0x5a19 paisaje_4  entrada 4 de la tabla de 0x593a
+D 0x5a19 0x5a1b paisaje_2  entrada 2 de la tabla de 0x593a
+D 0x5a1b 0x5a71 paisaje_3  entrada 3 de la tabla de 0x593a
+D 0x58ab 0x58af tabla_58ab  cuatro bytes (04 07 06 09) que 0x589e indexa con el nibble alto del modo mas lo que quede en A
+D 0x78c1 0x78c4 retal_78c1  1 x 1, el ultimo de los retales
+D 0x78c4 0x7c23 guiones_de_paisaje  los pares [modo][cuenta] a los que apunta la tabla de 0x5161. Los arranques que se usan de verdad son 0x78c4 y 0x78e5 (etapa 1), 0x7aaa, 0x7baa y 0x7acd (etapas 2 y 3) y 0x7960 (etapas 1, 4 y 5). El final de cada guion NO esta marcado: 0x585f lee los dos bytes sin comprobar nada, y lo que corta es que se acabe la etapa
+D 0x7e26 0x7e60 datos_7e26  entre las columnas del arcen y los guiones de paisaje del final
+D 0x7e60 0x7fe4 guiones_de_paisaje_b  los otros pares [modo][cuenta]: 0x7e60 (etapa 5), 0x7e83 (etapa 4) y 0x7ea8, 0x7f6b y 0x7ed1 (etapa 6)
+
+# ======================================================================
+# EL ROTULO GRANDE DE LA PRESENTACION
+# ======================================================================
+# L_49EC lo pinta en TRES filas, y las dos mitades entran deslizandose desde
+# lados contrarios: 0x49f9 lee el byte, y despues `ld a,c / cp 015h` decide si
+# el puntero avanza o RETROCEDE (`dec de / dec de / dec hl / dec hl`). Por eso
+# la primera mitad, la de C=0x11, esta guardada AL REVES -sus tres filas
+# acaban en 0x4b0c, 0x4b1d y 0x4b2e, y el 0xFF que las corta va DELANTE-, y la
+# segunda, la de C=0x15, va del derecho desde 0x4b2f. Lo que asoma en cada
+# fotograma lo dice el contador de 0xE004 (0x49f1).
+D 0x4afc 0x4b2f rotulo_izquierda  tres filas de 17 tiles guardadas AL REVES, cada una cerrada por delante con 0xFF; la carga 0x49d7 con C=0x11
+D 0x4b2f 0x4b6e rotulo_derecha  tres filas de 21 tiles del derecho; la carga 0x49e7 con C=0x15
+
+# ======================================================================
+# LA MARCA OCULTA DE KONAMI
+# ======================================================================
+# La firma que Manuel Pazos descubrio en los cartuchos de la casa: el numero
+# de catalogo y el titulo en katakana, escondidos al final de la ROM y sin que
+# ningun codigo los lea. Aqui son quince bytes en 0x7ff1: "RC-730" y
+# ロードファイター, o sea "Road Fighter".
+D 0x7ff1 0x8000 marca_oculta_de_konami  RC-730 y el titulo en katakana; no lo lee nadie, es la firma de la casa
+
+# ======================================================================
+# LAS TABLAS DEL DESPACHADOR DE 0x4045
+# ======================================================================
+# Van pegadas detras de su `call L_4045`, porque el despachador recupera la
+# tabla con un `pop hl`. Las seis estan declaradas en el .entries.
+D 0x50c9 0x50d5 tabla_por_etapa  6 entradas, desde 0x50c6 con el indice en (0xE043)
+F 0x50c9 w
+D 0x5526 0x5534 tabla_de_subestados  7 entradas, desde 0x5523 con el indice en (0xE043); las dos primeras van al mismo sitio
+F 0x5526 w
+D 0x570c 0x5716 tabla_de_paisaje  CINCO entradas, desde 0x5709 con el nibble bajo de (0xE07A). No son seis: la sexta palabra seria 0x462A, que cae en la ROM pero apunta a un `jr` de dentro del descompresor RLE. Esos dos bytes son ya el `ld hl,(0e046h)` de L_5716, la rutina que 0x5540 llama con `call 05716h`
+F 0x570c w
+D 0x6a80 0x6a90 tabla_6a80  8 entradas, desde 0x6a7d
+F 0x6a80 w
+D 0x70c9 0x70d9 tabla_de_objetos  8 entradas, desde 0x70c6; antes se apila 0x728A como direccion de retorno
+F 0x70c9 w
+
+# ======================================================================
+# LO QUE QUEDA, CADA COSA CON QUIEN LA CARGA
+# ======================================================================
+D 0x4165 0x4167 datos_4165  dos bytes entre dos tramos de codigo
+D 0x4471 0x4476 datos_4471  cinco bytes que nadie carga con una constante
+D 0x44a5 0x44a7 datos_44a5  dos bytes entre dos tramos de codigo
+D 0x44ea 0x44ed datos_44ea  tres bytes entre dos tramos de codigo
+D 0x459d 0x45a7 codigo_muerto_459d  diez bytes que son CODIGO -`call 0x0050 / exx / ld a,(00007h) / ld c,a / exx / ret`, el SETRD gemelo del SETWRT de 0x4591- y a los que no llama nadie
+D 0x45bc 0x45cf codigo_muerto_45bc  diecinueve bytes que son CODIGO -la version de tres tercios de L_45A7, con su `ld b,003h` y su `ld de,00800h`- y a los que no llama nadie
+D 0x4bd2 0x4be1 datos_4bd2  quince bytes que nadie carga con una constante
+D 0x5027 0x5028 relleno_5027  el byte al que apuntan las tres ultimas entradas vacias de la tabla de melodias
+D 0x50be 0x50bf relleno_50be  un byte entre dos tramos de codigo
+D 0x50dc 0x50e7 datos_50dc  once bytes que carga 0x5078
+D 0x5116 0x5122 datos_5116  doce bytes que carga 0x510a
+D 0x51c1 0x51c5 datos_51c1  cuatro bytes que carga 0x51a8
+D 0x5219 0x5224 datos_5219  once bytes que carga 0x51ff
+D 0x530f 0x5311 datos_530f  los dos bytes justo antes de la tabla de tramos
+D 0x5808 0x5810 datos_5808  ocho bytes que carga 0x57a7
+D 0x596d 0x5978 rotulo_check_point  "CHECK POINT" en tiles: el indice de patron es el ASCII menos 0x20, y DIBUJADO desde la VRAM del emulador sale la frase entera. Lo pega 0x5956 al llegar a 0x0F09 de recorrido
+D 0x5978 0x597d rotulo_goal  "GOAL" y un tile en blanco: lo que se lee al rematar la SEXTA etapa, en vez de CHECK POINT. Lo pega 0x5962, tres columnas mas a la derecha
+D 0x6b59 0x6b5e rotulo_empty  "EMPTY" en tiles (el ASCII menos 0x20): el aviso de que se acabo la gasolina. Lo escribe 0x6B4A sobre la propia calzada, en la casilla del coche
+D 0x6e3f 0x6e4a datos_6e3f  once bytes que carga 0x6e1d
+D 0x72af 0x72b8 datos_72af  nueve bytes que carga 0x7276
+D 0x7475 0x747d datos_7475  ocho bytes que 0x746a copia a 0xE04C con un ldir de ocho
+D 0x7791 0x7796 datos_7791  cinco bytes que carga 0x7780
+D 0x7c92 0x7dc5 paisajes_7c92  307 bytes de tiles de paisaje; el unico arranque que se carga con una constante es 0x7d8a, desde 0x5125, y al resto se llega avanzando el puntero de (0xE06F), que sube de tres en tres segun (0xE07A) (0x5790-0x5797)
+D 0x54f9 0x5501 datos_54f9  ocho bytes que carga 0x54c4
+D 0x569c 0x56a4 datos_569c  ocho bytes que carga 0x5621
+D 0x56a4 0x56ac datos_56a4  ocho bytes que carga 0x5669
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x4013 manejador_de_interrupcion
+B 0x4013 El gancho que INIT deja en H.KEYI: se ejecuta una vez por fotograma y de el cuelga TODO el juego. Lleva su propio cerrojo de reentrada en (0xE005), porque un fotograma lento puede pillar al anterior sin terminar.
+C 0x4013 RDVDP: leer el estado del VDP es lo que desarma la interrupcion
+C 0x4016 el sonido se atiende con las interrupciones cerradas
+C 0x401a el cerrojo de reentrada
+C 0x401d si ya hay un fotograma dentro, no se entra otra vez
+C 0x4021 echa el cerrojo
+C 0x4022 y a partir de aqui ya se puede interrumpir
+C 0x4023 lee el mando
+C 0x4026 el latido: sube el contador y reparte la escena
+C 0x4029 quita el cerrojo
+C 0x402e vuelve a leer el estado del VDP
+C 0x4031 el bit 7 dice si hay otra interrupcion pendiente
+C 0x4033 y si la hay, otra pasada de sonido antes de salir
+C 0x4038 WRTVDP, para escribir un registro del VDP
+L 0x403b suma_a_hl
+B 0x403b HL += A, con el acarreo a H. Es la que indexa casi todas las tablas del cartucho.
+C 0x403b A + L
+C 0x403d si no hubo acarreo, H se queda
+C 0x403e y si lo hubo, H sube uno
+L 0x4040 suma_a_de
+B 0x4040 La misma, con DE.
+C 0x4040 A + E
+C 0x4042 si no hubo acarreo, D se queda
+L 0x4045 despacha_por_indice
+B 0x4045 EL DESPACHADOR DEL CARTUCHO. Se llama con el indice en A y la tabla de punteros PEGADA DETRAS del propio `call`: el `pop hl` no recupera una direccion de retorno, recupera la tabla. Hay seis tablas asi, y ninguna se puede seguir con un trazado estatico, que es por lo que van declaradas a mano en el .entries.
+C 0x4045 el indice, por dos: son punteros de 16 bits
+C 0x4046 la direccion de retorno ES la tabla
+C 0x4047 HL apunta ya a la entrada que toca
+C 0x404a saca el puntero
+C 0x404d y salta a el sin volver: el `ret` de la rutina destino vuelve a quien llamo aqui
+L 0x404f init_del_cartucho
+B 0x404f El INIT que declara la cabecera del cartucho. Monta el gancho, borra las variables y se queda parado para siempre: de aqui en adelante el juego solo avanza dentro de la interrupcion.
+C 0x404f sin interrupciones mientras se monta el gancho
+C 0x4050 modo 1: la interrupcion salta a 0x0038, que la BIOS desvia a H.KEYI
+C 0x4052 un 0xC3 es el `jp` que se va a escribir en H.KEYI
+C 0x4054 H.KEYI (0xFD9A): el gancho que la BIOS ejecuta en cada interrupcion
+C 0x4057 y detras del `jp`, la direccion del manejador
+C 0x405a con esto H.KEYI queda como `jp L_4013`
+C 0x405d la pila, justo encima de los dos kilobytes de variables
+C 0x4060 borra de un golpe 0xE000..0xE7FF
+C 0x4069 el byte que se replica
+C 0x406d enciende la bandera de "montando"
+C 0x406f (0xE005) es el mismo cerrojo que mira el manejador
+C 0x4072 carga los registros del VDP y limpia la VRAM entera
+C 0x4076 ya esta montado
+C 0x4079 desarma la interrupcion pendiente leyendo el estado del VDP
+C 0x407c y a partir de aqui manda el gancho
+C 0x407d el bucle vacio donde INIT se queda para siempre
+C 0x407f puerta al sonido, para quien solo tenga el numero de efecto
+L 0x4082 latido_del_fotograma
+B 0x4082 El latido. Sube el contador de fotogramas y reparte por escena. El detalle que importa: si (0xE002) NO tiene el bit 7 puesto, apila 0x43C3 ANTES de repartir, de modo que la escena vuelve alli al terminar. Ese `push` es la unica forma de llegar a 0x43C3, y sin declararlo el trazado se dejaba setenta y seis bytes.
+C 0x4082 (0xE003) es el reloj del juego
+C 0x4086 (0xE002) trae las banderas de la partida
+C 0x4089 el bit 7 al signo
+C 0x408a con el bit puesto, la escena no lleva continuacion
+C 0x408d si no, se deja 0x43C3 en la pila
+C 0x4090 y la escena volvera ahi con su `ret`
+C 0x4091 C = la escena (0xE000), B = el paso (0xE001)
+C 0x4095 el indice del reparto es la escena
+C 0x4096 y detras del call, las nueve entradas
+B 0x40ab Escena 0. Paso 1: espera a que pase medio segundo largo y arranca la musica; paso 2 y siguientes, en 0x40C0.
+C 0x40ab paso 1 solamente; el resto, mas abajo
+C 0x40ad el reloj del juego
+C 0x40b0 el bit 0 al acarreo: solo se sigue un fotograma de cada dos
+C 0x40b2 mira si hay algo pendiente
+C 0x40b6 el bloque comprimido del rotulo de la casa
+C 0x40b9 lo suelta en la tabla de nombres
+C 0x40bd y a esperar
+C 0x40c0 paso 2 solamente
+C 0x40c2 limpia la pantalla
+C 0x40c5 monta la presentacion entera
+C 0x40c8 0x20 fotogramas de espera
+C 0x40cd paso 3 solamente
+C 0x40cf la cuenta atras del paso
+C 0x40d4 hasta que baje de 7
+C 0x40d8 borra el rotulo
+C 0x40de mientras tanto, anima el rotulo
+C 0x40e6 paso 4: el color del rotulo, mas abajo
+C 0x40e8 la cuenta atras del paso
+C 0x40ec cuando se acaba, a la escena siguiente
+C 0x40ef los dos bits de abajo del contador eligen el par de colores
+C 0x40f1 cada par son dos bytes
+C 0x40f2 la tabla de cuatro pares
+C 0x40f5 DE ya apunta al par que toca
+C 0x40fa el color del cuerpo del rotulo
+C 0x40fd 0xB0 bytes, que son 22 tiles
+C 0x4103 y el segundo byte del par
+C 0x4106 el color de la parte de abajo
+C 0x4109 0x58 bytes, once tiles
+C 0x410b FILVRM en los tres tercios
+C 0x410e y a la escena 0 otra vez
+L 0x411a monta_la_presentacion
+B 0x411a Vuelve a poner los registros del VDP, limpia la pantalla y carga la fuente y el marcador. Es lo que corre entre el rotulo de la casa y el menu.
+C 0x411a los ocho registros del VDP
+C 0x411d limpia la tabla de nombres
+C 0x4120 el efecto 0x1B
+C 0x4125 la fuente, a patron 0x2080
+C 0x4128 y el resto del decorado
+B 0x412d Escena 1: solo cuenta atras. Cuando (0xE004) llega a cero, arranca la partida.
+C 0x412d la cuenta atras del paso
+C 0x4131 mientras quede, sigue en la pantalla de juego
+C 0x4134 y al acabarse, a la escena siguiente
+B 0x4137 Escena 2: el remate de una partida. Vuelca el marcador, y si no hay nada pendiente vuelve a la portada.
+C 0x4137 paso 1 solamente
+C 0x4139 endereza el coche si venia derrapando
+C 0x413c y el latido de juego entero, que aqui sigue rodando
+C 0x413f la bandera de "se acabo"
+C 0x4145 y la de demostracion
+C 0x4149 si las dos estan a cero, no hay nada que hacer
+C 0x414b apaga la de demostracion
+C 0x414e escena 0: a la portada
+C 0x414f deja la escena
+C 0x4152 con 0x18 fotogramas de espera
+C 0x415a sortea la etapa: la demostracion no empieza siempre por la primera
+C 0x415d prepara la etapa
+C 0x4160 y a la escena 4
+C 0x4167 la cuenta atras del paso que empieza
+C 0x416a y al paso siguiente: el `djnz` de la escena se comera uno mas
+B 0x416f Escena 3, la mas larga: el menu, el montaje de la carretera y el arranque de la partida. Cada paso es un `djnz` de la fila.
+C 0x416f paso 1: parpadea la eleccion del menu
+C 0x4171 la cuenta atras
+C 0x4175 cuando se acaba, al paso siguiente
+C 0x4177 las banderas de la partida
+C 0x417a el bit 5 dice cual de las dos opciones esta elegida
+C 0x417c el guion de "LEVEL A"
+C 0x4181 o el de "LEVEL B"
+C 0x4184 el bit 2 de la cuenta hace el parpadeo
+C 0x4186 escribe el rotulo
+C 0x4189 o lo borra, que es el mismo guion con la mascara a cero
+C 0x418c paso 2 solamente
+C 0x418e limpia el menu
+C 0x4191 0x18 fotogramas
+C 0x4195 paso 3 solamente
+C 0x4197 prepara la partida y sale si no toca seguir
+C 0x419b carga los tiles comunes de la carretera
+C 0x419e prepara la etapa
+C 0x41a1 dibuja el marcador
+C 0x41a4 y lo rellena
+C 0x41a7 0x78 fotogramas, dos segundos largos
+C 0x41af paso 4 solamente
+C 0x41b1 limpia
+C 0x41b4 cuatro fotogramas
+C 0x41b9 paso 5 solamente
+C 0x41bd 0x1A fotogramas
+C 0x41c0 paso 6 solamente
+C 0x41c2 monta el paisaje de la salida en el anillo de RAM
+C 0x41c5 y lo vuelca a la pantalla
+C 0x41cb paso 7 solamente
+C 0x41cd arranca el motor de la carretera
+C 0x41d0 cinco fotogramas
+C 0x41d5 paso 8 solamente
+C 0x41d7 limpia
+C 0x41db deja 0x10 en la marca
+C 0x41dd nueve fotogramas
+C 0x41e2 paso 9 y siguientes
+C 0x41e6 sube los TREINTA sprites a la VRAM
+C 0x41e9 el reloj del juego
+C 0x41ec el bit 4 del reloj elige por donde entra el coche
+C 0x41ee 0xC8: debajo del borde de abajo, fuera de la pantalla
+C 0x41f2 o 0x80 si toca menos
+C 0x41f4 (0xE04C) es la Y del sprite del coche, MEDIDA contra la VRAM del emulador
+C 0x41f7 arranca la etapa
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+C 0x4200 si no, se sale
+C 0x4202 la segunda cuenta
+C 0x4204 cuando llega a uno
+C 0x4208 el bit 0 alterna el efecto
+C 0x420c y el valor 2 elige otro
+C 0x420e el efecto 5
+C 0x4212 o el 7
+C 0x4214 lo suelta
+C 0x4217 la cuenta atras
+C 0x421a su bit 0 elige el tile
+C 0x421c el tile 0x46
+C 0x4220 o el 0x44
+C 0x4226 y el 0x48 en el ultimo paso
+C 0x4228 la cuenta otra vez
+C 0x422b la tabla de nueve posiciones
+C 0x4231 el desplazamiento que toca
+C 0x4232 la fila 1, columna 6 de la tabla de nombres
+C 0x4235 corrido lo que diga la tabla
+C 0x4238 el primer tile
+C 0x4239 WRTVRM
+C 0x423c el de al lado es el siguiente
+C 0x423e y otro WRTVRM, que ya vuelve
+C 0x424a los dos tiles de la marca, en el anillo de la carretera
+C 0x4252 el coche, a media pantalla
+C 0x4254 (0xE04C) es la Y del sprite del coche
+C 0x4257 rearma el coche
+C 0x425a a la escena siguiente
+C 0x425e enciende la bandera de "se acabo"
+C 0x4266 el efecto 0x98
+C 0x426b 0x50 fotogramas
+B 0x4270 Escena 4: la cuenta atras antes de arrancar, con la carretera ya montada.
+C 0x4270 paso 1 solamente
+C 0x4272 limpia
+C 0x4275 enciende la bandera
+C 0x427a 0x1A fotogramas
+C 0x427f paso 2 solamente
+C 0x4281 la cuenta atras
+C 0x4285 0x30 fotogramas cuando se acabe
+C 0x428a se apila la vuelta
+C 0x428e y mientras tanto, la carretera avanza
+C 0x4292 paso 3 solamente
+C 0x4294 rearma el coche
+C 0x4297 y sube los trece primeros sprites
+C 0x429a 0x28 fotogramas
+C 0x429f paso 4 solamente
+C 0x42a1 limpia
+C 0x42a4 los cinco tiles de "START"
+C 0x42a7 en la fila 10, columna 10
+C 0x42ad los sube tal cual a la VRAM
+C 0x42b0 las banderas de la partida
+C 0x42b3 el bit 6 dice si hay partida de verdad
+C 0x42b7 si no lo es, suena el efecto 7
+C 0x42bc 0x48 fotogramas
+C 0x42c1 paso 5 solamente
+C 0x42c6 las banderas
+C 0x42c9 con partida en curso, a jugar
+C 0x42ce y si no la hay, escena 2 paso 1
+C 0x42d5 paso 6 y siguientes
+C 0x42d9 recarga los tiles de la carretera
+C 0x42dc dibuja el marcador
+C 0x42df y el rotulo de la etapa
+C 0x42e2 sube los trece primeros sprites
+C 0x42e5 0x78 fotogramas
+L 0x42ed rotulo_de_la_etapa
+B 0x42ed Escribe "STAGE" y a continuacion el numero, que lo pone 0x44ED.
+C 0x42ed el guion de "STAGE"
+C 0x42f0 lo escribe
+C 0x42f3 dos casillas atras
+C 0x42f5 y ahi va el numero
+L 0x42f8 pasa_a_la_escena_siguiente
+B 0x42f8 Sube (0xE000) y pone el paso a cero. Con 0x18 fotogramas de espera por la puerta de arriba, o los que traiga A por la de abajo.
+C 0x42f8 0x18 fotogramas
+C 0x42fa la cuenta atras del paso
+C 0x42fd la escena
+C 0x4300 la siguiente
+C 0x4301 y el paso, a cero
+B 0x4306 Escena 5: la partida en marcha. Si se acabo el tiempo o la vida, cambia de escena.
+C 0x4306 paso 1 solamente
+C 0x4308 dibuja la puntuacion
+C 0x430b la bandera de fin
+C 0x430f si esta puesta, se acabo
+C 0x4312 la de demostracion
+C 0x4316 en demostracion no se sale por aqui
+C 0x4317 y si no, a la escena siguiente
+C 0x4319 escena 8
+C 0x431e con la espera que traiga A
+C 0x4322 paso 2 y siguientes: el motor de la partida
+B 0x4325 Escena 6: el choque. Si (0xE083) no es cero, la carretera sigue rodando mientras el coche se estrella.
+C 0x4325 la velocidad
+C 0x4328 si es cero, no hay nada que arrastrar
+C 0x432b apaga el coche
+C 0x432e enciende la bandera de fin
+C 0x4333 se apila la vuelta
+C 0x4337 y la carretera sigue avanzando
+C 0x433a escena 5, paso 1
+C 0x4341 el efecto 0x95
+C 0x4346 y a la escena siguiente
+B 0x4348 Escena 7: GAME OVER.
+C 0x4348 el paso, a salvo
+C 0x4349 sube los trece primeros sprites
+C 0x434c el tile 6
+C 0x434e en 0x3B03, dentro de los atributos de sprite
+C 0x4351 WRTVRM
+C 0x4355 paso 1 solamente
+C 0x4357 limpia
+C 0x435a las banderas
+C 0x435e apaga el bit 6: ya no hay partida
+C 0x4361 y a la portada
+C 0x4364 paso 2 y siguientes
+C 0x4368 el guion de "GAME OVER"
+C 0x436b lo escribe
+C 0x436e 0xD8 fotogramas, casi cuatro segundos
+B 0x4373 Escena 8: el final de una etapa. Rearma el marcador, dibuja la bandera de meta y pasa a la etapa siguiente.
+C 0x4373 el paso, a salvo
+C 0x4374 sube los trece primeros sprites
+C 0x4377 y el paisaje
+C 0x437b paso 1 solamente
+C 0x4381 monta la calzada de la meta
+C 0x4384 y a esperar
+C 0x4388 paso 2 solamente
+C 0x438d paso 3 solamente
+C 0x4392 paso 4 y siguientes: el cambio de etapa
+B 0x4394 EL CAMBIO DE ETAPA. Sube (0xE043) y, cuando llega a SIETE, la deja en uno y sube (0xE042), que es el contador de vueltas. O sea que el cartucho tiene SEIS etapas y despues vuelve a empezar contando vueltas.
+C 0x4394 la etapa
+C 0x4397 una mas
+C 0x4399 pasada la sexta
+C 0x439b escena 4, paso 0
+C 0x439e si no se ha pasado, se queda asi
+C 0x43a0 escena 3, paso 3
+C 0x43a3 y la etapa vuelve a ser la primera
+C 0x43a6 (0xE042), el contador de vueltas
+C 0x43a7 una vuelta mas
+C 0x43a8 deja el paso a cero
+C 0x43ab y la escena y el paso que se eligieron
+C 0x43b2 prepara la etapa nueva
+C 0x43b5 el tile 0x6C
+C 0x43b7 en el anillo de la carretera
+C 0x43bb limpia
+C 0x43be 0x18 fotogramas
+B 0x43c3 LA CONTINUACION. 0x4082 la deja en la pila antes de repartir, asi que corre DESPUES de la escena, todos los fotogramas. Lee el mando y atiende la pausa y el cambio de nivel.
+C 0x43c3 lee el mando
+C 0x43c6 (0xE03A) guarda lo que se pulso antes
+C 0x43c9 devuelve solo lo que se acaba de pulsar
+C 0x43cd si no hay nada nuevo, no hay nada que hacer
+C 0x43ce la cuenta atras del paso
+C 0x43d1 se pone a cero
+C 0x43d3 y su valor anterior pasa a L
+C 0x43d4 (0xE03B) es el nivel elegido
+C 0x43d7 B = lo que habia en la cuenta
+C 0x43d8 si no era uno, por otro lado
+C 0x43da los dos bits del disparo
+C 0x43dc sin disparo, solo cambia el nivel
+C 0x43de el nivel de ahora
+C 0x43e0 banderas 0x40
+C 0x43e4 o 0x60 si estaba en el otro
+C 0x43e6 las deja puestas
+C 0x43e9 y el paso, a tres
+C 0x43ec con el contador a cero
+C 0x43f0 y arranca
+C 0x43f3 el paso, a uno
+C 0x43f5 el efecto 0x1B
+C 0x43fa siete fotogramas
+C 0x43ff repinta la presentacion
+C 0x4402 y deja la cuenta a cero
+C 0x4407 el nivel
+C 0x4408 le da la vuelta: A pasa a B y B a A
+C 0x440a y lo guarda
+L 0x440c espera_y_sal
+B 0x440c El idiom mas usado del cartucho: baja la cuenta del paso y, si NO ha llegado a cero, se come la direccion de retorno de quien llamo. O sea que quien la llama se sale a la vez, y solo sigue adelante cuando la cuenta se agota.
+C 0x440c la cuenta atras del paso
+C 0x440f si llega a cero, se vuelve normal
+C 0x4411 y si no, se tira el retorno de quien llamo
+C 0x4412 con lo que este tambien se sale
+L 0x4413 borra_las_variables_de_partida
+B 0x4413 Pone a cero 0xE03F..0xE14D y deja (0xE042) a cero y (0xE043) a uno: vuelta cero, etapa uno.
+C 0x4413 desde 0xE03F
+C 0x4416 0x10F bytes
+C 0x441c el cero que se replica
+C 0x4420 (0xE042), la vuelta
+C 0x4424 a cero
+C 0x4427 y (0xE043), la etapa, a uno
+L 0x4429 cortina_de_sprites
+B 0x4429 La cortina que abre y cierra la pantalla: usa la tabla de atributos de sprite para tapar por bandas. La cuenta del paso dice cuanto queda abierto, y con 0x001C0 por 32 sale la altura de la banda.
+C 0x4429 la cuenta atras del paso
+C 0x442c mientras sea negativa, se sale
+C 0x442e 0x17 menos lo que quede
+C 0x4431 la base
+C 0x4436 por 32
+C 0x443b la escena
+C 0x443e la 3 es la de la partida
+C 0x4440 0x1F bytes
+C 0x4445 las banderas
+C 0x4448 el bit 6, el de partida en curso
+C 0x444c y entonces 0x17
+C 0x444e con cero
+C 0x444f FILVRM: borra la banda
+C 0x4452 los atributos de sprite, desde el segundo
+C 0x4455 y les pone la Y de fuera de pantalla
+C 0x445d en la partida, tambien el primero
+C 0x4467 el primer sprite
+C 0x446a la Y 0xD0, que apaga todos los sprites de ahi abajo
+C 0x446c WRTVRM
+L 0x4476 esconde_sprites
+B 0x4476 Pone 0xC8 en la Y de B sprites, de cuatro en cuatro bytes: los deja justo debajo del borde de abajo.
+C 0x4476 la Y, fuera de la pantalla
+C 0x4478 y al sprite siguiente, cuatro bytes mas alla
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x447f suma_a_la_puntuacion
+B 0x447f Suma DE a la puntuacion, que son TRES bytes en BCD empaquetado en 0xE03F..0xE041 y por tanto seis cifras. El tope es 999999: si el ultimo `daa` desborda, se clava en 0x9999.
+C 0x447f el acarreo del tercer byte
+C 0x4481 las banderas de la partida
+C 0x4484 el bit 6 al signo
+C 0x4485 y si no esta puesto, no se puntua
+C 0x4486 la puntuacion, byte bajo
+C 0x448a las dos cifras de abajo
+C 0x448b `daa` es lo que la mantiene en BCD
+C 0x448d al byte siguiente
+C 0x448f con el acarreo
+C 0x4494 y el tercero
+C 0x4497 si no desborda, ya esta
+C 0x4499 y si desborda, se clava
+C 0x449c en 999999
+L 0x44a7 actualiza_el_record
+B 0x44a7 Compara la puntuacion (0xE03F..0xE041) con el record (0xE042..0xE044) de arriba abajo y, si es mayor, se lleva los tres bytes con un `lddr`.
+C 0x44a8 el byte alto del record
+C 0x44ac si la puntuacion no llega, no hay bonificacion
+C 0x44af cinco mas, en BCD
+C 0x44b2 y si desborda, al tope
+C 0x44b7 tres bytes que comparar
+C 0x44b9 desde el byte ALTO de cada uno
+C 0x44bd la cifra de la puntuacion
+C 0x44be menos la del record
+C 0x44bf si es menor, se acabo la comparacion
+C 0x44c1 si son distintas y no hubo prestamo, la puntuacion gana
+C 0x44c2 y si son iguales, a la cifra siguiente
+C 0x44c6 tres bytes
+C 0x44c9 del byte alto de la puntuacion
+C 0x44cb al byte alto del record
+C 0x44cd y hacia abajo
+L 0x44d0 dibuja_el_marcador
+B 0x44d0 Monta el marcador entero: los indicadores de la derecha y los dos rotulos fijos.
+C 0x44d0 los indicadores
+C 0x44d3 el guion de "HISCORE" y "SCORE"
+C 0x44d9 la puntuacion
+C 0x44dc en la fila 1, columna 24
+C 0x44e2 y el record
+C 0x44e6 tres bytes de BCD
+C 0x44ed la etapa
+C 0x44f0 un solo byte
+L 0x44f4 monta_los_indicadores
+B 0x44f4 Los cuadros de SPEED y FUEL de la derecha, mas los tiles del marco.
+C 0x44f4 la fila 5, columna 25
+C 0x44f7 el tile 0x6F
+C 0x44f9 cuatro casillas
+C 0x44fc FILVRM
+C 0x44ff la fila 6, columna 25
+C 0x4501 los cuatro tiles del cuadro
+C 0x4507 los sube tal cual
+C 0x450a la fila 7, columna 25
+C 0x450c ocho filas
+C 0x450f los cuatro tiles de una fila
+C 0x4512 una fila de cuatro
+C 0x4515 y a la siguiente
+C 0x451b la fila 7, columna 25 otra vez
+C 0x451d el tile 0x72
+C 0x451f cuatro casillas
+C 0x4524 el guion de la marca de la casa
+C 0x4527 lo escribe
+C 0x452a y a poner las cifras
+L 0x4535 escribe_cifras_bcd
+B 0x4535 Escribe B bytes de BCD empaquetado -dos cifras por byte- en la VRAM, del byte ALTO al bajo. La mascara de C apaga los ceros de delante: hasta que sale la primera cifra distinta de cero, `and c` con C=0 deja un espacio. En cuanto aparece una, C pasa a 0xFF y ya no se tapa nada. El ultimo byte nunca se tapa (0x4542), para que un cero se vea como cero.
+C 0x4535 la mascara arranca tapando
+C 0x4537 el byte de BCD
+C 0x4538 la cifra de arriba a los cuatro bits de abajo
+C 0x453e si es cero, sigue tapada
+C 0x4540 y si no, se destapa para siempre
+C 0x4542 en el ultimo byte
+C 0x4545 no se tapa nada
+C 0x4548 la fuente tiene los digitos a partir del tile 0x10
+C 0x454a la mascara
+C 0x454b WRTVRM
+C 0x454f el mismo byte
+C 0x4550 y ahora la cifra de abajo
+C 0x455c el byte anterior, que es menos significativo
+C 0x455e y siguiente
+L 0x4561 casilla_a_direccion
+B 0x4561 Convierte una posicion en la direccion de su casilla en la tabla de nombres. Baja HL cinco bits arrastrando por H y remata con `or 0x38`, que es la base 0x3800 que fija R2.
+C 0x4561 la parte baja
+C 0x4562 cinco desplazamientos, arrastrando por H
+C 0x456e lo que quedo en H
+C 0x456f los dos bits que sobreviven
+C 0x4571 la tabla de nombres empieza en 0x3800
+C 0x4573 y ya esta la direccion
+L 0x4575 rectangulo_de_tiles
+B 0x4575 B renglones de C tiles, saltando 0x20 de uno a otro: la anchura de la pantalla. Es con lo que se dibujan los cuadros del marcador.
+C 0x4575 la cuenta de filas, a salvo
+C 0x4576 B ha de ser cero: el contador de bytes es solo C
+C 0x4578 sube la fila
+C 0x457c una fila entera son 32 casillas
+C 0x457e HL a la fila de abajo
+C 0x4581 y otra vez
+L 0x4584 limpia_la_pantalla
+B 0x4584 Apaga los sprites y pone la tabla de nombres entera a cero.
+C 0x4584 esconde los sprites
+C 0x4587 la tabla de nombres
+C 0x458a 768 casillas
+C 0x458e FILVRM
+L 0x4591 fija_escritura
+B 0x4591 SETWRT con HL, y deja el PUERTO de datos del VDP en el C alternativo. Asi el que escriba despues solo tiene que hacer `out (c),a` sin volver a mirar nada. A se conserva con `ex af,af'`.
+C 0x4591 A, a salvo
+C 0x4592 SETWRT: fija la direccion de escritura
+C 0x4596 0x0006 es donde la BIOS guarda el puerto de datos del VDP
+C 0x4599 y se queda en el C alternativo
+C 0x459b A, de vuelta
+L 0x45a7 sube_a_la_vram
+B 0x45a7 Copia BC bytes de (DE) a la VRAM desde HL, sin pasar por la BIOS: SETWRT una vez y luego `out (c),a` a pelo.
+C 0x45a7 fija la direccion
+C 0x45aa el puerto de datos
+C 0x45b0 el byte
+C 0x45b2 y al VDP
+C 0x45b6 uno menos
+C 0x45b7 hasta que BC llegue a cero
+L 0x45cf llena_los_tres_tercios
+B 0x45cf FILVRM repetido en los TRES tercios de SCREEN 2, sumando 0x800 cada vez. En este modo cada tercio de pantalla tiene su propia copia de las tablas, asi que llenar uno solo dejaria dos tercios sin pintar.
+C 0x45cf tres tercios
+C 0x45d3 FILVRM
+C 0x45d6 el tercio siguiente esta 0x800 mas alla
+C 0x45dc uno menos
+L 0x45e0 descomprime_los_tres_tercios
+B 0x45e0 Igual, pero descomprimiendo: el MISMO bloque en los tres tercios. El `push de` / `pop de` es lo que rebobina el flujo en cada vuelta.
+C 0x45e0 tres tercios
+C 0x45e3 el flujo, a salvo: se vuelve a leer entero
+C 0x45e4 lo suelta
+C 0x45e7 y el tercio siguiente
+C 0x45eb el flujo, otra vez desde el principio
+L 0x45f0 escribe_rotulo
+B 0x45f0 El interprete de rotulos. El guion llega en DE y es [destino de VRAM, palabra] seguido de indices de tile, con 0xFE para saltar a otro destino y 0xFF para terminar. La mascara de C se aplica a cada tile: con 0xFF sale el tile, y por la puerta de 0x4607, con C=0, sale un cero. O sea que la MISMA lista sirve para escribir el rotulo y para borrarlo.
+C 0x45f0 la mascara que deja pasar el tile
+C 0x45f2 HL pasa a ser el guion
+C 0x45f3 los dos bytes del destino
+C 0x45f6 HL, el destino; DE, el guion
+C 0x45f7 y DE, ya detras del destino
+C 0x45f8 el byte del guion
+C 0x45fa 0xFF es -1
+C 0x45fc y cierra el guion
+C 0x45fd 0xFE es -2
+C 0x45fe y manda a leer otro destino
+C 0x4600 la mascara: 0xFF lo deja, 0x00 lo borra
+C 0x4601 WRTVRM
+C 0x4604 y a la casilla siguiente
+C 0x4607 la mascara que BORRA
+C 0x4609 por lo demas, la misma rutina
+L 0x460b descomprime_con_destino_dentro
+B 0x460b La segunda puerta del descompresor: el destino de VRAM va DENTRO del bloque, en sus dos primeros bytes. Es tambien a donde salta el mandato 0x80 para cambiar de destino a mitad de bloque.
+C 0x460b HL pasa a ser el bloque
+C 0x460c los dos bytes del destino
+C 0x460f HL, el destino; DE, el bloque
+C 0x4610 y DE, ya detras del destino
+L 0x4611 descomprime
+B 0x4611 EL DESCOMPRESOR. Escribe directamente en la VRAM, no en memoria. Un byte de mandato: 0x00 cierra el bloque, de 0x01 a 0x7F repite el byte siguiente esa cuenta, 0x80 toma los dos bytes siguientes como destino nuevo, y de 0x81 a 0xFF copia tal cual los (mandato & 0x7F) bytes que siguen. La comparacion `and 07fh / cp b` es lo que mira el bit 7 sin tocar el mandato.
+C 0x4611 fija la escritura y prepara el puerto
+C 0x4614 el mandato
+C 0x4616 el 0x00 cierra el bloque
+C 0x4618 B se queda con el mandato ENTERO
+C 0x4619 y A, solo con la cuenta
+C 0x461b si coinciden, el bit 7 estaba a cero
+C 0x461c y entonces es una repeticion
+C 0x461e con el bit 7 puesto, si la cuenta es cero
+C 0x461f el mandato era 0x80: destino nuevo
+C 0x4621 y si no, la cuenta del literal
+C 0x4622 el byte
+C 0x4625 al VDP
+C 0x4628 tantos como diga la cuenta
+C 0x462c el byte que se repite
+C 0x462f al VDP
+C 0x4632 tantas veces como diga el mandato
+L 0x4636 espeja_patrones_de_sprite
+B 0x4636 Da la vuelta a C patrones de sprite. Un patron de 16x16 son 32 bytes: los dieciseis de la mitad izquierda y detras los de la derecha. Para verlo del reves no basta con invertir los bits, hay que CRUZAR las dos mitades, y eso es lo que hace el juego del registro E: sube dieciseis, resta 0x20 y mira su bit 4, con lo que la primera mitad cae 0x10 mas abajo y la segunda 0x10 mas arriba.
+C 0x4636 el destino del patron, a salvo
+C 0x4637 media figura, dieciseis bytes
+C 0x4639 lee, invierte y escribe
+C 0x463d solo E: el cruce de mitades vive en los ocho bits de abajo
+C 0x4640 lo que quedo en E
+C 0x4641 treinta y dos atras
+C 0x4644 y su bit 4 dice si falta la otra mitad
+C 0x4648 el destino del patron
+C 0x4649 el patron siguiente, treinta y dos bytes mas alla
+C 0x464e uno menos
+L 0x4652 espeja_tiles
+B 0x4652 El espejo de los tiles de fondo, y en los tres tercios. Asi el cartucho tiene la mitad derecha de la carretera sin guardarla: la fabrica dando la vuelta a la izquierda.
+C 0x4652 tres tercios
+C 0x4657 un tile son ocho bytes
+C 0x4659 lee, invierte y escribe
+C 0x4660 C tiles
+C 0x4663 el origen
+C 0x4664 el tercio siguiente
+C 0x4668 y lo mismo con el destino
+L 0x466e invierte_los_bits
+B 0x466e Le da la vuelta a A. Ocho veces `rr c` y `rla`: el bit que sale por abajo de C entra por arriba de A. Es el espejo de un byte de patron.
+C 0x466f el byte de partida
+C 0x4670 ocho bits
+C 0x4672 el bit 0 al acarreo
+C 0x4674 y del acarreo al bit 0 de A, empujando
+L 0x4679 espeja_un_byte_de_vram
+B 0x4679 Lee un byte de la VRAM en HL, le da la vuelta y lo deja en DE.
+C 0x4679 RDVRM
+C 0x467c del reves
+C 0x467f el destino
+C 0x4680 WRTVRM
+C 0x4683 y HL vuelve a ser el origen
+L 0x4685 arranca_el_hardware
+B 0x4685 Silencia el PSG, deja el efecto 0x1B, borra los 16 KB de VRAM enteros y carga los ocho registros del VDP.
+C 0x4685 el mandato 0xB8 al sonido
+C 0x468a el efecto 0x1B
+C 0x468f desde la direccion 0
+C 0x4692 los 16 KB de la VRAM
+C 0x4695 FILVRM
+L 0x4698 carga_los_registros_del_vdp
+B 0x4698 Los ocho registros, del 0 al 7, de la tabla de 0x46A9. Son `02 E2 0E 7F 07 76 03 E4`: SCREEN 2, sprites de 16x16, nombres en 0x3800, COLORES en 0x0000 y PATRONES en 0x2000 -al reves del reparto habitual-, atributos de sprite en 0x3B00 y patrones de sprite en 0x1800.
+C 0x4698 la tabla
+C 0x469b ocho registros
+C 0x469d empezando por el 0
+C 0x469f el valor
+C 0x46a0 WRTVDP
+C 0x46a4 y al registro siguiente
+C 0x46b1 el registro 7, el del borde y el fondo
+L 0x46b6 lee_el_mando_nuevo
+B 0x46b6 Lee el mando y deja en (0xE008) solo lo que se acaba de pulsar, comparandolo con lo que habia en (0xE009).
+C 0x46b6 lee el mando
+C 0x46b9 lo que estaba pulsado antes
+C 0x46bc lo de antes
+C 0x46bd guarda lo de ahora
+C 0x46be los que han cambiado
+C 0x46bf y de esos, solo los que ahora estan pulsados
+C 0x46c0 (0xE008)
+C 0x46c1 ahi quedan los recien pulsados
+L 0x46c3 lee_el_mando
+B 0x46c3 Junta el joystick y el teclado en un solo byte. El joystick sale del registro 14 del PSG, y las teclas de las filas 7 y 8 de la matriz se van encajando a su lado con desplazamientos, de modo que arriba quede el mismo bit se pulse donde se pulse.
+C 0x46c3 el registro 15 del PSG manda en los puertos
+C 0x46c7 WRTPSG
+C 0x46ca el registro 14 es el que trae el joystick
+C 0x46cc sin interrupciones, que el PSG es de dos pasos
+C 0x46cd RDPSG
+C 0x46d1 el PSG da los bits al reves
+C 0x46d2 y solo interesan seis
+C 0x46d4 a salvo
+C 0x46d5 la fila 7 de la matriz del teclado
+C 0x46d7 SNSMAT
+C 0x46da tambien al reves
+C 0x46db el bit que interesa, a su sitio
+C 0x46df la fila 8, la del cursor
+C 0x46e1 SNSMAT
+C 0x46e5 dos desplazamientos
+C 0x46e8 y se va encajando bit a bit
+C 0x46f9 el joystick
+C 0x46fa juntado con el teclado
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x4773 carga_la_fuente
+B 0x4773 La fuente del cartucho: 43 tiles a partir del 0x10, en PATRON 0x2080, y su color relleno de 0xF0 -blanco sobre transparente-. Que el 0xF0 vaya a 0x0080 es la prueba de que ahi estan los COLORES y no los patrones: como patron dejaria medio bloque pintado en cada letra.
+C 0x4773 primero el marco de colores
+C 0x4776 el bloque comprimido de la fuente
+C 0x4779 patron 0x2080, o sea el tile 0x10
+C 0x477f blanco sobre transparente
+C 0x4781 el color de esos mismos tiles
+C 0x4784 0x160 bytes, cuarenta y tres tiles
+C 0x4787 y a llenar
+L 0x489a marco_de_colores
+B 0x489a Borra los dieciseis primeros tiles y le da a cada uno un color distinto, del 0 al 15: el tile N queda pintado del color N. Es la paleta de trabajo con la que despues se colorean los rotulos.
+C 0x489a los patrones de los dieciseis primeros tiles
+C 0x489d 0x80 bytes
+C 0x48a0 a cero: tiles vacios
+C 0x48a4 el color del tile 0
+C 0x48a7 cada tile son ocho bytes de color
+C 0x48aa dieciseis tiles
+C 0x48ad las ocho lineas del tile
+C 0x48b1 todas del mismo color
+C 0x48b5 al tile siguiente
+C 0x48b6 y al color siguiente
+C 0x48bb catorce
+C 0x48bd (0xE00A) es la cuenta del barrido
+C 0x48c0 la ultima casilla de la pantalla
+C 0x48c3 (0xE00E) es por donde va
+C 0x48c6 y a cargar el marcador
+L 0x48c9 carga_el_rotulo_de_la_casa
+B 0x48c9 Los 27 tiles del rotulo KONAMI, en PATRON 0x2200, con el color a 0xF0. La direccion 0x6200 lleva puesto el bit de escritura del VDP, pero SETWRT hace `and 03fh` sobre H antes de nada, asi que acaba en 0x2200.
+C 0x48c9 el bloque comprimido
+C 0x48cc 0x6200, que enmascarado es el patron 0x2200
+C 0x48d2 y el color de esos tiles
+C 0x48d5 0xD8 bytes, veintisiete tiles
+C 0x48d8 blanco sobre transparente
+L 0x48dd barre_la_pantalla
+B 0x48dd El barrido que borra la pantalla de abajo arriba: cada llamada sube 0x20 -una fila- y escribe tres tramos de tiles seguidos, dejando un rastro que se va comiendo la imagen.
+C 0x48dd por donde va el barrido
+C 0x48e0 una fila hacia arriba
+C 0x48e7 el tile 0x40
+C 0x48e9 tres casillas
+C 0x48ee el tile 0x0C, doce casillas
+C 0x48f4 y otras doce
+C 0x48f8 el resto, a cero
+C 0x48f9 FILVRM
+C 0x48fc la cuenta del barrido
+C 0x48ff una menos
+C 0x4901 el sitio, a salvo
+C 0x4902 WRTVRM
+C 0x4906 tiles consecutivos
+C 0x4909 el sitio de partida
+C 0x490a una fila entera
+C 0x490d y devuelve la fila de abajo
+L 0x49a6 monta_la_presentacion_entera
+B 0x49a6 Deja el fondo negro, limpia, carga la fuente y los 33 tiles del rotulo ROAD FIGHTER, y arranca el latido del color.
+C 0x49a6 el registro 7: borde y fondo
+C 0x49a8 lo escribe
+C 0x49ab limpia la tabla de nombres
+C 0x49ae la fuente
+C 0x49b1 el bloque del rotulo grande
+C 0x49b4 patron 0x2600, o sea el tile 0xC0
+C 0x49ba el primer par de colores
+C 0x49bc y a latir
+L 0x49c2 escribe_la_presentacion
+B 0x49c2 El texto del menu y las dos mitades del rotulo. Los dos `call` seguidos al interprete no son un error: el primero se come el guion de 0x472A y deja DE justo en el siguiente, que es el de "LEVEL B".
+C 0x49c2 el guion del titulo
+C 0x49c5 "(C)KONAMI 1985", "PLAY SELECT" y "LEVEL A"
+C 0x49c8 y con DE ya en el guion siguiente, "LEVEL B"
+C 0x49cb la cuenta del deslizamiento
+C 0x49ce lo que lleva recorrido
+C 0x49d2 la fila 2 de la tabla de nombres
+C 0x49d7 la mitad de "ROAD", guardada AL REVES
+C 0x49da diecisiete de ancho: por eso se recorre hacia atras
+C 0x49df la cuenta otra vez
+C 0x49e2 la fila 6
+C 0x49e7 y "FIGHTER", del derecho
+C 0x49ea veintiuno de ancho
+L 0x49ec desliza_el_rotulo
+B 0x49ec Pinta las tres filas del rotulo, y el SENTIDO lo decide la anchura: con C=0x15 los punteros avanzan, y con cualquier otra cosa los dos `dec` de 0x4A10 deshacen los `inc` y dejan un -1. Por eso "ROAD" esta guardado del reves, con su 0xFF por delante de la fila en vez de detras. La cuenta de (0xE004) limita cuantas casillas asoman, y asi las dos mitades entran deslizandose desde lados contrarios.
+C 0x49ec tres filas
+C 0x49ee la cuenta de filas, a salvo
+C 0x49ef el sitio en pantalla
+C 0x49f0 y el sitio en los datos
+C 0x49f1 la cuenta del deslizamiento
+C 0x49f8 dice cuantas casillas asoman
+C 0x49f9 el tile
+C 0x49fa 0xFF es -1
+C 0x49fb y cierra la fila
+C 0x49fd SETWRT
+C 0x4a01 el puerto de datos del VDP
+C 0x4a06 escribe el tile
+C 0x4a09 adelante los dos punteros
+C 0x4a0b la anchura
+C 0x4a0c veintiuno se recorre hacia delante
+C 0x4a0e y ya esta
+C 0x4a10 y cualquier otra, hacia atras: los dos `dec` dejan un -1 neto
+C 0x4a14 hasta agotar lo que asoma
+C 0x4a19 la fila de abajo
+C 0x4a1f y en los datos, una fila entera
+C 0x4a22 tres veces
+L 0x4b6e suena
+B 0x4b6e Puerta normal al sonido: pide el efecto que trae A. El D a cero es lo que lo distingue de la puerta de 0x4B76, que la usa el propio motor.
+C 0x4b6e con las interrupciones cerradas
+C 0x4b6f la marca de "peticion de fuera"
+L 0x4b76 pide_efecto
+B 0x4b76 Elige la VOZ segun el numero de efecto y, si la que le toca esta ocupada por algo de mas prioridad, no hace nada. Las tres voces son bloques de once bytes en 0xE010, 0xE01B y 0xE026.
+C 0x4b76 el efecto, a salvo
+C 0x4b77 una voz
+C 0x4b79 la voz 1
+C 0x4b7c el numero, sin las banderas de arriba
+C 0x4b7e el 1 es la musica: entra siempre
+C 0x4b82 por debajo de 5
+C 0x4b86 y por debajo de 0x0F
+C 0x4b8a si no, las TRES voces
+C 0x4b8e la voz 2
+C 0x4b91 y son dos voces
+C 0x4b94 la voz 3
+C 0x4b97 si la peticion es de dentro, no se mira la prioridad
+C 0x4b9a lo que suena ahora en esa voz
+C 0x4b9d y su numero
+C 0x4b9f el que se pide
+C 0x4ba1 el numero MAS BAJO manda
+C 0x4ba2 y si el nuevo es mayor, se descarta
+C 0x4ba3 el numero limpio
+C 0x4ba5 por dos: son punteros
+C 0x4ba6 la tabla de melodias. Va desde 0x4DE0 y no desde 0x4DE2 porque el indice empieza en uno: el efecto 0 es el silencio y su entrada no existe
+C 0x4bac al principio del bloque de la voz
+C 0x4baf el patron de ruido
+C 0x4bb2 (0xE032)
+C 0x4bb5 y el otro
+C 0x4bbc la voz, en marcha
+C 0x4bc2 con su numero de efecto
+C 0x4bc4 y el puntero a la melodia
+C 0x4bca once bytes por voz: cuatro ya escritos y siete de salto
+C 0x4bcf y la voz siguiente, si eran varias
+L 0x4be1 enciende_o_apaga_canales
+B 0x4be1 Toca el registro 7 del PSG, el que dice que canales suenan. Con D distinto de cero apaga los tres bits de la voz, y con D a cero los enciende.
+C 0x4be1 lo que hay ahora en el registro 7
+C 0x4be5 el numero de voz
+C 0x4be6 la voz 1 no se corre
+C 0x4beb tres bits por voz
+C 0x4bee si la peticion venia de fuera
+C 0x4bf1 apaga esos bits
+C 0x4bf5 y si no, los enciende
+C 0x4bf6 (0xE031) es la copia del registro 7
+C 0x4bfa el registro 7 del PSG
+C 0x4bfc WRTPSG
+L 0x4bff latido_del_sonido
+B 0x4bff El motor, una vez por fotograma: recorre las TRES voces, que son bloques de once bytes desde 0xE010.
+C 0x4bff la copia del registro 7
+C 0x4c02 la vuelve a escribir
+C 0x4c05 la voz 1
+C 0x4c07 el primer bloque de voz
+C 0x4c0c tres voces
+C 0x4c0e once bytes de una a otra
+C 0x4c12 el estado de la voz
+C 0x4c15 el 1 es "recien arrancada"
+C 0x4c1a y si no es cero, hay algo que sonar
+C 0x4c1d dos canales por voz
+C 0x4c20 al bloque siguiente
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x4c25 ruido_del_motor
+B 0x4c25 El sonido del coche. El periodo NO es fijo: sale de la velocidad de (0xE04F) a base de desplazamientos, con tres tramos -por debajo de 0x30, de 0x30 a 0x7D y de 0x7E arriba- y un sumando distinto en cada uno. Por eso el motor sube de tono al acelerar.
+C 0x4c25 el segundo generador de ruido
+C 0x4c29 el reloj del juego
+C 0x4c2c uno de cada cuatro fotogramas
+C 0x4c30 en los impares, solo el volumen
+C 0x4c34 y en el 2, el otro generador
+C 0x4c36 la velocidad
+C 0x4c3e por cuatro
+C 0x4c40 (0xE038) dice si el coche esta en marcha
+C 0x4c47 la velocidad otra vez
+C 0x4c4a a partir de 0x7E, el tramo de arriba
+C 0x4c4e de 0x30 a 0x7D, el de en medio
+C 0x4c52 y por debajo, por ocho
+C 0x4c5e por dos
+C 0x4c61 mas la velocidad
+C 0x4c62 y el sumando del tramo alto
+C 0x4c67 por dos
+C 0x4c68 y el sumando de parado
+C 0x4c6d la velocidad
+C 0x4c70 lo que pasa de 0x30
+C 0x4c75 por dieciseis
+C 0x4c79 y el sumando del tramo de en medio
+C 0x4c7d el periodo, montado
+C 0x4c7e (0xE036) lo guarda
+C 0x4c81 el primer generador de ruido
+C 0x4c85 el periodo del motor
+C 0x4c89 y el del generador
+C 0x4c8f la diferencia es lo que suena
+C 0x4c91 lo escribe en el PSG
+C 0x4c94 la velocidad del coche
+C 0x4c97 por debajo de 0x10 casi no hay ruido
+C 0x4c9b lo que suena en la voz 3
+C 0x4caa el volumen alto del motor
+C 0x4cae el volumen bajo
+C 0x4cb2 o nada
+C 0x4cb4 el registro 8 del PSG, el volumen del canal A
+C 0x4cb6 WRTPSG
+L 0x4cbc latido_de_una_voz
+B 0x4cbc Lo que le toca a UNA voz en este fotograma: gasta la duracion de la nota que suena y, cuando se agota, lee el mandato siguiente de su melodia.
+C 0x4cbc el bit 6 del efecto
+C 0x4cbe apagar
+C 0x4cc0 si no esta puesto, apaga los canales de la voz
+C 0x4cc3 el numero de efecto
+C 0x4cc7 con el bit 7 puesto, la melodia lleva mandatos largos
+C 0x4cca la duracion de la nota
+C 0x4ccd mientras quede, no se lee nada mas
+L 0x4cce lee_el_mandato
+B 0x4cce Saca el mandato siguiente de la melodia. El nibble de arriba dice que es: 0x2x fija cuanto dura una nota, 0x1x toca el ruido, 0xFF cierra la melodia, y cualquier otro es una NOTA -el nibble de arriba, el volumen; el de abajo y el byte que sigue, el periodo-.
+C 0x4cce por donde va la melodia
+C 0x4cd4 el mandato
+C 0x4cd5 0xFF cierra
+C 0x4cd9 con el bit 7 del efecto, van los mandatos largos
+C 0x4ce0 el nibble de arriba
+C 0x4ce2 el mandato 0x2x
+C 0x4ce6 su argumento
+C 0x4ce9 fija cuanto dura una nota
+C 0x4cec y al mandato siguiente
+C 0x4ced el mandato
+C 0x4cf0 el 0x1x
+C 0x4cf4 los cinco bits de abajo
+C 0x4cf8 el registro 6 del PSG, el periodo del ruido
+C 0x4cfa WRTPSG
+C 0x4cfd encender
+C 0x4cff y enciende los canales de la voz
+C 0x4d03 el mandato
+C 0x4d06 el nibble de arriba, a B
+C 0x4d07 y el de abajo, a D
+C 0x4d0a el byte que sigue completa el periodo
+C 0x4d0b guarda por donde va la melodia
+C 0x4d0f y escribe el periodo
+C 0x4d13 el nibble de arriba, abajo
+C 0x4d17 el volumen de partida
+C 0x4d18 cuanto dura una nota
+C 0x4d1b arranca la cuenta
+C 0x4d1e dos mas
+C 0x4d20 para el decaimiento
+C 0x4d25 se acabo la melodia
+C 0x4d29 apagar
+C 0x4d2b apaga los canales
+C 0x4d2f y la voz queda libre
+C 0x4d35 la cuenta de la nota
+C 0x4d38 y al agotarse, el mandato siguiente
+C 0x4d3b la cuenta del decaimiento
+C 0x4d41 cuando alcanza a la de la nota
+C 0x4d46 y quedan menos de tres
+C 0x4d4b una mas
+C 0x4d4e el volumen
+C 0x4d51 uno menos
+C 0x4d52 y en cuanto se pasa de cero, se acabo
+C 0x4d57 el numero de canal
+C 0x4d59 los registros 8, 9 y 10 son los de volumen
+C 0x4d5b el volumen
+C 0x4d5c WRTPSG
+L 0x4d5f mandatos_largos
+B 0x4d5f Los tres mandatos de arriba, que solo aparecen en las melodias con el bit 7 puesto en su numero: 0xDx fija el multiplicador de duracion, 0xFx el escalon del volumen y 0xEx la octava. Van encadenados, asi que una nota puede traer los tres.
+C 0x4d5f el mandato
+C 0x4d62 el 0xDx
+C 0x4d67 su argumento
+C 0x4d69 el multiplicador de duracion
+C 0x4d6d y el mandato siguiente
+C 0x4d6e el 0xFx
+C 0x4d72 su argumento
+C 0x4d74 el escalon del volumen
+C 0x4d79 el 0xEx
+C 0x4d7d su argumento
+C 0x4d7f la octava
+C 0x4d84 el nibble de abajo del mandato
+C 0x4d87 el multiplicador
+C 0x4d8c la duracion sale de multiplicar sumando
+C 0x4d91 y esa es la de la nota
+C 0x4d94 el mandato
+C 0x4d95 guarda por donde va la melodia
+C 0x4d98 el nibble de arriba, abajo
+C 0x4d9e el volumen de partida
+C 0x4d9f doce menos
+C 0x4da1 el escalon del decaimiento
+C 0x4da4 si daba cero
+C 0x4da6 se usa el del mandato 0xFx
+C 0x4dac y a sonar
+L 0x4db0 nota_a_periodo
+B 0x4db0 De numero de nota a periodo del PSG. La tabla de 0x4DD6 son los DOCE semitonos de una octava, y cada `add hl,hl` la baja una octava mas.
+C 0x4db0 los doce semitonos
+C 0x4db3 el que toca
+C 0x4db6 el periodo
+C 0x4db9 la octava
+C 0x4dbd sin octava, se queda como esta
+C 0x4dc0 y cada vuelta, una octava mas baja
+L 0x4dc3 escribe_el_periodo
+B 0x4dc3 Suelta el periodo en los dos registros del canal: el alto en C y el bajo en C-1. C vale 1, 3 o 5, o sea los pares (0,1), (2,3) y (4,5) del PSG.
+C 0x4dc3 el registro alto
+C 0x4dc5 WRTPSG
+C 0x4dc9 y el de al lado, el bajo
+C 0x4dcb WRTPSG
+L 0x4dce guarda_la_marcha
+B 0x4dce Adelanta el puntero de la melodia y lo deja en el bloque de la voz.
+C 0x4dce al byte siguiente
+C 0x4dcf y ahi queda por donde va
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x5028 parpadea_la_eleccion
+B 0x5028 La manita del menu, que va y viene. El bit 3 de la cuenta hace el parpadeo, y (0xE03B) dice sobre cual de las dos opciones esta: 0x3A0A es LEVEL A y 0x3A4A, LEVEL B. La de abajo se borra siempre, escribiendo el mismo guion con la mascara a cero.
+C 0x5028 la cuenta atras del paso
+C 0x502b su bit 3
+C 0x502d la mascara que deja el tile
+C 0x5031 o la que lo borra
+C 0x5032 el sitio de LEVEL A
+C 0x5035 y el de LEVEL B
+C 0x5038 el nivel elegido
+C 0x503e si es el B, se cambian
+C 0x503f el otro sitio, a salvo
+C 0x5040 dibuja la manita donde toca
+C 0x5043 y en el otro
+C 0x5044 la borra
+C 0x5046 los dos tiles de la manita
+C 0x5049 entra al interprete SIN leer destino: ya lo trae HL
+L 0x504c prepara_la_etapa
+B 0x504c Deja lista una etapa: borra las variables de juego, monta el arcen, elige el guion de carretera segun la vuelta y coloca el puntero del plan de la etapa. El anillo del paisaje arranca en 0xE186.
+C 0x504c las variables de la partida
+C 0x5052 0x34E bytes
+C 0x5059 borra los objetos de la carretera
+C 0x505c la fila nueva del anillo
+C 0x5062 el tile 0x20
+C 0x5064 veintitres casillas
+C 0x5068 el contador de vueltas
+C 0x506d si ya se ha dado una vuelta, el guion duro
+C 0x506f la etapa
+C 0x5071 el guion normal
+C 0x5074 salvo en la sexta
+C 0x5078 que lleva el mismo que a partir de la segunda vuelta
+C 0x507b (0xE0B2) es el guion elegido
+C 0x507e monta el paisaje de esta etapa
+C 0x5081 ocho
+C 0x5083 (0xE07D) es el margen del arcen
+C 0x5086 rearma los objetos
+C 0x5089 0xD0, la velocidad de arranque
+C 0x508e la etapa
+C 0x5092 el tile de fondo de cada etapa
+C 0x5098 y su byte
+C 0x5099 a (0xE089)
+C 0x509c la etapa otra vez
+C 0x50a0 por dieciseis
+C 0x50a7 el plan de las seis etapas
+C 0x50aa la fila que toca
+C 0x50ab (0xE0BD), por donde va el plan
+C 0x50ae y saca el primer tramo
+C 0x50b1 cuatro
+C 0x50b6 el anillo del paisaje empieza aqui
+C 0x50b9 (0xE046) es la ventana del anillo
+L 0x50bf monta_el_paisaje_de_la_etapa
+B 0x50bf Reparte por etapa: cada una tiene su propia mezcla de listas de calzada y de paisaje. La tabla de seis entradas va pegada detras del `call`.
+C 0x50bf los tres guiones de esta etapa
+C 0x50c2 la etapa
+C 0x50c6 una rama por etapa
+C 0x50d5 la lista de lineas separadas
+C 0x50d8 (0xE090) es la de la calzada
+C 0x50e7 hay etapas que no cambian nada
+C 0x50e8 las columnas del arcen
+C 0x50eb (0xE08A) es la que arma la fila nueva
+C 0x50ef la lista de lineas juntas
+C 0x50f5 y el paisaje B
+C 0x50f8 (0xE06F) es el paisaje
+C 0x50fd la marca de alternancia
+C 0x5103 un guion de paisaje propio
+C 0x510a doce bytes de golpe
+C 0x510d sobre 0xE08A y los que siguen
+C 0x5122 lo mismo que la etapa anterior
+C 0x5125 y ademas otro arcen
+C 0x512b y su cuenta
+L 0x5132 elige_los_guiones_de_la_etapa
+B 0x5132 Copia a 0xE071 los TRES punteros de guion de paisaje de esta etapa, de la tabla de 0x5161, y saca el primer par [modo, cuenta].
+C 0x5132 la etapa
+C 0x5136 por seis: tres punteros de dos bytes
+C 0x513a la tabla de guiones
+C 0x5140 los seis bytes
+C 0x5143 a 0xE071
+C 0x5148 la marca de arranque
+C 0x514d el primer puntero
+C 0x5150 el par [modo, cuenta]
+C 0x5157 y ahi queda por donde va
+C 0x515a el paisaje de la salida
+C 0x515d (0xE06F)
+L 0x5197 monta_los_indicadores_moviles
+B 0x5197 Rellena las dos barras del cuadro de mandos -velocidad y gasolina- con bloques de cuatro bytes, ocho filas cada una y 0x18 de separacion.
+C 0x5197 la primera barra
+C 0x519a su color y su tile
+C 0x51a0 la segunda
+C 0x51a5 ocho filas
+C 0x51a7 la cuenta, a salvo
+C 0x51a8 los cuatro bytes de una fila
+C 0x51ab dos por fila
+C 0x51ae la altura
+C 0x51b1 y el tile
+C 0x51b4 y detras los dos de la tabla
+C 0x51bb la fila siguiente, 0x18 mas abajo
+L 0x51c5 rearma_la_partida
+B 0x51c5 Vuelve a dejarlo todo en su sitio despues de un choque: los objetos, la velocidad, el coche y el plan de tramos.
+C 0x51c5 los objetos
+C 0x51c8 y lo vuelve a poner sobre la calzada
+C 0x51cb el coche
+C 0x51ce esconde los sprites
+C 0x51d2 (0xE0B9) es el tramo que se esta usando
+C 0x51d5 y saca el tramo siguiente
+L 0x51d8 esconde_los_sprites_de_juego
+B 0x51d8 Pone 0xC8 en los 0x31 bytes de 0xE11A: la copia en RAM de los atributos de sprite, con todos fuera de la pantalla.
+C 0x51d8 la copia de los atributos
+C 0x51de 0x31 bytes
+C 0x51e1 la Y de fuera de pantalla
+L 0x51e5 borra_los_objetos
+B 0x51e5 Pone a cero los 0x45 bytes de 0xE0C1: los cuatro objetos de carretera y su contador.
+C 0x51e5 los objetos
+C 0x51eb 0x45 bytes
+L 0x51f3 pon_el_coche_sobre_la_calzada
+B 0x51f3 Saca la x del coche del arcen: (0xE0AD) es la casilla 22 de las veinticuatro de la cola del arcen, la que corresponde a la altura a la que va el coche; por dos, redondeada a ocho y mas 0x20 da la columna en pixeles. Asi el coche reaparece SIEMPRE sobre la calzada, este esta donde este.
+C 0x51f3 la casilla 22 de la cola del arcen, la de la altura del coche
+C 0x51f6 por dos
+C 0x51f7 redondeada a ocho
+C 0x51f9 mas 0x20
+L 0x51ff arranca_las_variables_de_carrera
+B 0x51ff Copia las dos plantillas: once bytes a 0xE049 y doce a 0xE10E.
+C 0x51ff la primera plantilla
+C 0x5205 once bytes
+C 0x520a rearma el coche
+C 0x520d la segunda plantilla
+C 0x5213 doce bytes
+L 0x5224 latido_de_la_partida
+B 0x5224 Lo que corre en cada fotograma de juego: marcador, paisaje, objetos y coche.
+C 0x5224 sube los trece primeros sprites a la VRAM
+C 0x5227 el paisaje
+C 0x522a los objetos de la carretera
+C 0x522d y el coche
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x68aa carga_los_tiles_de_la_carretera
+B 0x68aa Los tiles comunes a todas las etapas. Se ven dos cosas: que los COLORES estan en 0x0000 y los PATRONES en 0x2000 -al reves del reparto habitual, porque asi lo dejan R3=0x7F y R4=0x07-, y que la mitad derecha de la calzada no se guarda: se fabrica con el espejo de 0x4652 a partir de la izquierda.
+C 0x68aa los 64 tiles de calzada
+C 0x68ad al patron 0x2200
+C 0x68b3 y su color. OJO: este bloque empieza DENTRO del anterior, y sus 32 primeros bytes son los ultimos de aquel
+C 0x68b6 al color 0x0200
+C 0x68bc el patron 0x2680
+C 0x68bf cinco tiles mas
+C 0x68c5 su color
+C 0x68ce cuatro tiles de la izquierda
+C 0x68d1 a la derecha
+C 0x68d6 dandoles la vuelta
+C 0x68d9 y el color de esos
+C 0x68e2 el patron 0x26C8
+C 0x68f4 ocho tiles mas
+C 0x68f7 al otro lado
+C 0x68fc del reves
+C 0x68ff y el MISMO bloque de color otra vez
+C 0x6908 el patron 0x2748
+C 0x691a seis tiles
+C 0x691d espejados
+C 0x692e los diez primeros patrones de sprite
+C 0x6931 que llevan el destino dentro
+C 0x6934 seis figuras de 16x16
+C 0x6937 a su version espejada
+C 0x693c cruzando las dos mitades de cada una
+C 0x693f y los veinticinco patrones de sprite que faltan
+C 0x6945 el tono del decorado de esta etapa
+C 0x6948 la etapa
+C 0x694c la 1 solo lleva su decorado
+C 0x6950 la 2, decorado y un tramo mas
+C 0x6953 la 3, solo decorado
+C 0x6957 la 4
+C 0x695b y la 5, que comparten todo
+C 0x695e la 6: decorado y despues un retoque de color
+C 0x6961 el color de 0x06C8
+C 0x6964 0x100 bytes
+B 0x6967 El retoque de la etapa 6: recorre 256 bytes de color y a todos los que tengan un 0x0F de fondo se lo cambia por un 7. Se lee de la VRAM y se vuelve a escribir, byte a byte.
+C 0x6969 RDVRM
+C 0x696c el color, a salvo
+C 0x696d el fondo
+C 0x696f solo si es blanco
+C 0x6973 se conserva la tinta
+C 0x6976 y el fondo pasa a ser el 7
+C 0x697a un byte
+C 0x697d y lo devuelve a los tres tercios
+C 0x6982 el siguiente
+C 0x6986 hasta los 256
+B 0x6989 La etapa 2: su decorado y ademas los tiles de 0x63AC en el patron 0x2588.
+C 0x6989 el decorado de la etapa
+C 0x698c y un tramo mas de calzada
+C 0x698f en el patron 0x2588
+B 0x6995 Las etapas 4 y 5, que comparten decorado. Se ve el mismo truco tres veces: cargar la mitad y fabricar la otra con el espejo.
+C 0x6995 los tiles de 0x63AC
+C 0x6998 al patron 0x2400
+C 0x699e y de ahi
+C 0x69a1 al 0x2588
+C 0x69a4 veinticuatro tiles
+C 0x69a6 del reves
+C 0x69a9 su color
+C 0x69b2 encima, el decorado de la etapa
+C 0x69bb y otra vez el espejo
+C 0x69c1 trece tiles
+C 0x69c6 el color, el mismo bloque
+C 0x69cf en los dos sitios
+C 0x69d8 un tramo mas de patron
+C 0x69e1 con su color
+C 0x69ea la etapa
+C 0x69ed y solo en la cuarta, dos retoques de color mas
+L 0x6a06 tono_del_decorado
+B 0x6a06 Le da a los dieciseis tiles de 0x0748 el tono de la etapa, que sale de la tabla de 0x6A69. Se queda el nibble BAJO de cada byte -el fondo- y le mete el tono en el alto. Detalle: la tabla se indexa con la etapa SIN restarle uno, asi que su primer byte no lo usa nadie.
+C 0x6a06 la etapa
+C 0x6a09 la tabla de tonos
+C 0x6a0f el tono
+C 0x6a10 a (0xE09D)
+C 0x6a13 el color de esos tiles
+C 0x6a16 128 bytes, dieciseis tiles
+C 0x6a18 el byte
+C 0x6a1a RDVRM
+C 0x6a1d se queda el fondo
+C 0x6a20 el tono de la etapa
+C 0x6a23 y va en la tinta
+C 0x6a24 un byte
+C 0x6a27 a los tres tercios
+C 0x6a2c el siguiente
+L 0x6a30 carga_el_decorado
+B 0x6a30 El decorado de ESTA etapa: dos punteros de la tabla de 0x6A51, cuatro bytes por etapa. El primero al patron de 0x2400 y el segundo al color de 0x0400. Las etapas 4 y 5 apuntan a los mismos dos, asi que de seis etapas solo hay CINCO decorados distintos.
+C 0x6a30 la etapa
+C 0x6a34 por cuatro: dos punteros
+C 0x6a36 la tabla de decorados
+C 0x6a3c el primer puntero
+C 0x6a3f la tabla, a salvo
+C 0x6a40 al patron 0x2400
+C 0x6a46 la tabla
+C 0x6a48 y el segundo puntero
+C 0x6a4b al color 0x0400
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x53dd suelta_el_rival
+B 0x53dd Mete en juego el objeto de 0xE105, el unico que no sale del reparto normal de tramos: hacen falta 0x0F00 de recorrido, que el tramo en curso sea del tipo 7 y que el coche siga entero. Se coloca contra la Y del coche -(0xE04C), menos 0x10 y menos 0xB8- y su carril sale del hueco 6 con cuatro de margen.
+C 0x53dd lo recorrido
+C 0x53e0 antes de 0x0F00 no aparece
+C 0x53e6 y si no llega, nada
+C 0x53e7 el tramo en curso
+C 0x53eb solo en los del tipo 7
+C 0x53ee el estado del coche
+C 0x53f2 si esta fuera de juego, tampoco
+C 0x53f3 el hueco 6
+C 0x53f5 busca sitio
+C 0x53f8 la Y del coche
+C 0x53fd contra la posicion del hueco
+C 0x5402 si no cabe, se deja
+C 0x5403 la posicion del hueco
+C 0x5404 corrida 0x30
+C 0x5409 y su carril
+C 0x540a cuatro mas
+C 0x5410 la x del coche
+C 0x5416 menos la del hueco
+C 0x5418 por cuatro
+C 0x541b el bloque del rival
+C 0x541f si ya esta ocupado
+C 0x5420 no se toca
+C 0x5421 en marcha
+C 0x5425 la fila
+C 0x5428 la columna
+C 0x542a el patron 0x90
+C 0x542d el color 3
+C 0x5430 y la velocidad con que se acerca
+L 0x5434 mueve_el_rival
+B 0x5434 Lo adelanta un poco cada fotograma, mira si ha chocado con el coche del jugador y deja su sprite en la copia de atributos de 0xE13E. Con el motor sonando, cada ocho fotogramas suelta el efecto 4.
+C 0x5434 el bloque del rival
+C 0x5439 si no esta en juego, nada
+C 0x543c su posicion
+C 0x543d pasada 0xC0 se ha ido
+C 0x5441 las banderas de la partida
+C 0x5444 el bit 6, partida de verdad
+C 0x5449 el reloj del juego
+C 0x544c uno de cada ocho
+C 0x5450 el efecto 4
+C 0x5456 la Y del coche
+C 0x5459 contra la posicion del rival
+C 0x545c y con margen de 0x18
+C 0x545e si no se tocan, se mueve y ya
+C 0x5462 la x del coche
+C 0x5465 contra su carril
+C 0x5468 con margen de 0x10
+C 0x546a y si tambien coinciden, hay choque
+C 0x546c su velocidad vertical
+C 0x5472 la posicion, en dos bytes
+C 0x5476 y avanza
+C 0x5479 su velocidad horizontal
+C 0x547f la otra posicion
+C 0x5486 los bytes enteros de las dos posiciones
+C 0x5489 a la copia de atributos de sprite
+C 0x5491 el reloj del juego
+C 0x5494 dos bits
+C 0x5496 eligen el patron entre 0x6C y 0x78: asi la figura se anima
+C 0x549a y el color 8
+L 0x549e retira_al_rival
+B 0x549e Lo saca de juego y esconde su sprite poniendole la Y a 0xE0.
+C 0x549e el bloque del rival
+C 0x54a1 fuera de juego
+C 0x54a3 la Y de fuera de pantalla
+C 0x54a9 lo retira
+C 0x54ac y da parte del choque
+L 0x54af arma_el_paisaje
+B 0x54af Lee el guion de paisaje de (0xE0B2), que son pares [distancia, tramo], y cuando lo recorrido alcanza la distancia arranca un tramo nuevo: cuatro bytes de la tabla de 0x54F9, dos filas de ellos, y el margen sale del arcen de (0xE098).
+C 0x54af (0xE0B4) es lo que queda del tramo de ahora
+C 0x54b4 mientras quede, se sigue con el
+C 0x54b6 el guion de paisaje
+C 0x54b9 lo recorrido
+C 0x54bc si no llega a la distancia del par, nada
+C 0x54bf el tramo que toca
+C 0x54c1 y el guion avanza al par siguiente
+C 0x54c4 la tabla de tramos de paisaje
+C 0x54c7 por cuatro
+C 0x54cc (0xE0B5), por donde va el tramo
+C 0x54cf dos filas
+C 0x54d1 (0xE0B4)
+C 0x54d4 el arcen
+C 0x54d7 sus bits de arriba
+C 0x54db mas dos
+C 0x54dd (0xE0B7) es la columna donde cae
+C 0x54e0 por donde va el tramo
+C 0x54e3 la columna
+C 0x54e6 la fila nueva del anillo
+C 0x54e9 corrida a esa columna
+C 0x54ec dos bytes
+C 0x54f1 y el tramo avanza
+C 0x54f7 una fila menos
+L 0x5501 puntua_el_recorrido
+B 0x5501 Tres puntos por cada vez que cambia el bit 0 de lo recorrido: es la puntuacion por distancia.
+C 0x5501 el estado del coche
+C 0x5505 fuera de juego no se puntua
+C 0x5506 el bit que se vigila
+C 0x5508 lo recorrido
+C 0x550d y como estaba
+C 0x5513 si no ha cambiado, nada
+C 0x5516 lo apunta
+C 0x5517 tres puntos
+C 0x551a a la puntuacion
+L 0x551d motor_de_la_carretera
+B 0x551d El reparto de la carretera POR ETAPA: la tabla de siete entradas de 0x5526 se indexa con (0xE043) directamente, sin restar uno, y por eso su primera entrada apunta al mismo sitio que la segunda. Cada etapa tiene su propia mezcla de calzada y paisaje.
+C 0x551d el paisaje base
+C 0x5520 la etapa
+C 0x5523 y detras del call, las siete ramas
+C 0x5534 las lineas de la calzada
+C 0x5537 el paisaje de los lados
+C 0x553a y el rotulo de meta, si toca
+C 0x553d el guion de paisaje
+C 0x5540 y el remate
+C 0x5543 se come la vuelta: sale a quien llamo al reparto
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x7755 remate_del_choque
+B 0x7755 Lo que pasa despues de un golpe: se recupera la velocidad, se apunta la bonificacion segun cuantos rivales se habian pasado y suena el efecto 3.
+C 0x7755 (0xE0B8) es la fase del choque
+C 0x7759 la primera
+C 0x775c la segunda, mas abajo
+C 0x775f la velocidad
+C 0x7763 0x20 mas
+C 0x7765 con tope en 0xD7
+C 0x7768 y si se pasa
+C 0x776a se queda en el tope
+C 0x776c rearma el coche
+C 0x776f la fase del choque
+C 0x7772 una mas
+C 0x7776 el tile 0x60
+C 0x7779 los rivales pasados
+C 0x777a con tope en cuatro
+C 0x7780 la tabla de bonificaciones
+C 0x7786 el byte alto de los puntos
+C 0x7789 a la puntuacion
+C 0x778c el efecto 3
+L 0x7796 dibuja_el_aviso
+B 0x7796 Mientras dura la cuenta de (0xE0BA), pone el sprite del aviso de puntos encima del coche. El patron sale de (0xE0B9) por cuatro mas 0x94, con tope en tres: son los rotulos de 300, 500, 800 y 1000.
+C 0x7796 la cuenta del aviso
+C 0x779a al agotarse, se retira
+C 0x779c la copia de atributos de sprite
+C 0x779f la posicion del coche
+C 0x77a3 0x10 mas arriba
+C 0x77a8 y su columna
+C 0x77aa los rivales pasados
+C 0x77ae con tope en cuatro
+C 0x77b4 por cuatro
+C 0x77b6 el primer patron de los avisos
+C 0x77ba y el color 6
+C 0x77be lo retira
+C 0x77c2 la Y de fuera de pantalla
+L 0x77c8 monta_la_salida
+B 0x77c8 El paisaje de la SALIDA, montado a mano retal a retal. Primero llena el anillo entero de hierba con un `lddr` de 0x225 bytes y despues va pegando los ocho retales, heredando cada llamada el DE que dejo la anterior: por eso a veces solo se le cambia E. Rehecho paso a paso en tools/graficos.py, sale igual que la maquina salvo dos casillas del arco de meta, que estan animadas.
+C 0x77c8 la ultima casilla del anillo
+C 0x77ce el tile de hierba
+C 0x77d0 0x225 bytes
+C 0x77d3 replicado hacia atras: llena el anillo entero
+C 0x77d5 la calzada, siete de ancho por cuatro de alto
+C 0x77d8 en la columna 8
+C 0x77da repetida seis veces: veinticuatro filas
+C 0x77df el arcen con sus postes
+C 0x77e2 en la columna 18
+C 0x77e8 la fila de arriba
+C 0x77e9 y la columna 45
+C 0x77ee los postes sueltos
+C 0x77f1 en la columna 0x36
+C 0x77f3 quince veces
+C 0x77f8 donde quedo
+C 0x77fb el tile 0x4E
+C 0x77fd cinco veces
+C 0x7801 y el 0x56 detras
+C 0x7804 un tile suelto
+C 0x780a catorce veces
+C 0x780f el arco de la meta
+C 0x7812 en la columna 4
+C 0x7818 otro poste
+C 0x781d trece veces
+C 0x7826 el tile 0x4E
+C 0x7828 tres veces
+C 0x782c el rotulo de "START"
+C 0x782f en la columna 0x31
+C 0x7834 y los dos ultimos
+C 0x783c en la columna 0x338: cae dentro del pegador que sigue
+L 0x783f pega_un_retal
+B 0x783f EL PEGADOR DE RETALES. El retal empieza por sus dos medidas y detras van los tiles seguidos. El `ld a,016h / sub c` es lo que fija la anchura del anillo: VEINTIDOS columnas, no las 32 de la pantalla. Y el `dec a / jr nz` del final repite el mismo retal hacia abajo tantas veces como diga A, que es como se alarga un tramo de carretera sin gastar bytes.
+C 0x783f el retal, a salvo
+C 0x7840 el alto
+C 0x7842 y el ancho
+C 0x7845 la cuenta de repeticiones, a salvo
+C 0x7846 veintidos columnas tiene el anillo
+C 0x7848 menos el ancho: lo que sobra de fila
+C 0x7849 el contador de bytes es solo C
+C 0x784b la fila
+C 0x784d lo que sobra
+C 0x784f el destino salta al renglon siguiente
+C 0x7853 tantas filas como diga el alto
+C 0x7855 el retal, otra vez desde el principio
+C 0x7856 una repeticion menos
+C 0x7859 y sale con A a uno, que es lo que espera el que llame despues
+L 0x57a7 arma_la_fila_del_paisaje
+B 0x57a7 Arma la fila nueva del anillo: un byte de la tabla de 0x5808 -elegido por los tres bits de abajo de la cuenta- y detras un tramo del paisaje, tan largo como diga (0xE081). Al agotarse la cuenta se cambia de paisaje, y el nuevo sale de la tabla de punteros de 0x593A indexada con el nibble bajo del modo.
+C 0x57a7 la tabla de ocho bytes
+C 0x57aa la cuenta del tramo
+C 0x57ad sus tres bits de abajo
+C 0x57b2 el margen del arcen
+C 0x57b5 la fila nueva
+C 0x57b8 corrida ese margen
+C 0x57ba el byte del borde
+C 0x57bc por donde va el paisaje
+C 0x57bf lo ancho que es
+C 0x57c3 nueve menos
+C 0x57c7 y ahi empieza
+C 0x57cc el tramo entero
+C 0x57ce dos bytes de salto
+C 0x57d0 y ahi queda por donde va
+C 0x57d3 la cuenta del tramo
+C 0x57d7 una menos
+C 0x57da y al pasarse, el par siguiente del guion
+C 0x57de uno de cada ocho
+C 0x57e3 y no cuando se acaba
+C 0x57e4 el modo
+C 0x57e7 la anchura
+C 0x57ea una mas
+C 0x57eb el nibble bajo del modo
+C 0x57ed con el 3 se ensancha
+C 0x57f1 y si no, se estrecha
+C 0x57f3 el modo
+C 0x57f7 su nibble bajo
+C 0x57f9 por dos: son punteros
+C 0x57fa la tabla de paisajes
+C 0x5800 el elegido
+C 0x5804 y a partir de ahi se lee
+L 0x5810 arma_la_fila_estrecha
+B 0x5810 La otra puerta, la de los tramos de una sola columna: en vez de copiar un tramo entero copia UN byte, y el margen de (0xE07D) es el que se va abriendo o cerrando.
+C 0x5810 la cuenta del tramo
+C 0x5814 al agotarse, el par siguiente
+C 0x5817 uno de cada ocho
+C 0x581b el modo
+C 0x5820 el margen
+C 0x5823 uno mas
+C 0x5824 con el 2 se abre
+C 0x5828 y si no, se cierra
+C 0x582a el modo
+C 0x5830 por dos
+C 0x5831 la tabla de paisajes
+C 0x583b y ese es el paisaje
+C 0x583e por donde va
+C 0x5841 el margen
+C 0x5844 la fila nueva
+C 0x5849 un solo byte
+C 0x584b el resto de la fila
+C 0x584e y ahi queda por donde va
+C 0x5852 el modo
+C 0x5857 el margen
+C 0x585a con el 1 se queda
+C 0x585e y si no, se abre uno
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x6e1d dibuja_el_coche
+B 0x6e1d Deja el coche en la copia de atributos de sprite de 0xE112. El patron sale de la tabla de 0x6E3F indexada con (0xE053), que es hacia donde esta girado, y se escriben DOS sprites: el de la carroceria y, cuatro patrones mas alla, el de su color.
+C 0x6e1d la tabla de patrones del coche
+C 0x6e20 hacia donde va girado
+C 0x6e26 el patron que le toca
+C 0x6e28 la posicion del coche
+C 0x6e2e y su carril
+C 0x6e2f la copia de atributos de sprite
+C 0x6e35 el segundo sprite va cuatro patrones mas alla
+C 0x6e37 la fila
+C 0x6e39 la columna
+C 0x6e3b el patron
+C 0x6e3d y salta al sprite siguiente
+L 0x6e4a mira_los_choques
+B 0x6e4a Recorre los objetos de la carretera desde el primero mirando si alguno toca al coche.
+C 0x6e4a el estado del coche
+C 0x6e4e fuera de juego no hay choque que valga
+C 0x6e4f el indice de objeto
+C 0x6e53 desde el primero
+B 0x6e54 Un objeto: bloques de dieciseis bytes desde 0xE0E5. Se compara la posicion con margen 0x20 y el carril con margen 0x16, y si coinciden las dos hay contacto. El carril tambien dice por que LADO se ha tocado, que es lo que decide hacia donde sale despedido.
+C 0x6e54 el indice
+C 0x6e58 a salvo
+C 0x6e5a por dieciseis
+C 0x6e62 (0xE0BF) apunta al objeto
+C 0x6e66 el indice, otra vez
+C 0x6e6a su tipo
+C 0x6e6d si es cero, el hueco esta libre
+C 0x6e71 busca sus coordenadas
+C 0x6e74 la posicion del coche
+C 0x6e77 contra la del objeto
+C 0x6e78 con margen de 0x20
+C 0x6e7d si no se solapan, al objeto siguiente
+C 0x6e80 el carril del coche
+C 0x6e83 contra el del objeto
+C 0x6e84 por que lado queda
+C 0x6e88 por el otro
+C 0x6e89 margen de 0x16
+C 0x6e8d y si tampoco, al siguiente
+C 0x6e91 (0xE054) guarda el lado del golpe
+C 0x6e94 el indice del objeto
+C 0x6e97 el tercero es el que mata
+C 0x6e9c el objeto
+C 0x6ea0 los tipos 6 y 7
+C 0x6ea4 tampoco perdonan
+C 0x6ea8 el objeto pasa a estar tocado
+C 0x6eab con su cuenta
+C 0x6ead nueve bytes mas alla
+C 0x6eb3 el lado del golpe
+C 0x6eb5 sale hacia un lado
+C 0x6eb9 o hacia el otro
+B 0x6ebb El golpe. Deja al coche derrapando -estado 4- y, si lo que se toco era del tipo 8, lo retira y arranca la fase de choque de (0xE0B8).
+C 0x6ebb el estado del coche
+C 0x6ebf el 7 es el de ya estar chocando
+C 0x6ec3 el lado del golpe
+C 0x6ec6 al contrario
+C 0x6ecc empuja al objeto
+C 0x6ecf 0x20
+C 0x6ed1 (0xE0B1) es lo que dura el derrape
+C 0x6ed4 derrapando
+C 0x6ed9 y se redibuja
+C 0x6edf el tipo del objeto
+C 0x6ee0 solo el 8 se retira
+C 0x6ee3 (0xE0E3) los cuenta
+C 0x6ee7 lo apunta
+C 0x6eee el hueco queda libre
+C 0x6ef0 el indice del objeto
+C 0x6ef3 por ocho
+C 0x6ef6 la copia de atributos de sprite
+C 0x6efc la Y de fuera de pantalla
+C 0x6f02 y la del segundo sprite
+C 0x6f04 la fase del choque
+C 0x6f07 arranca
+C 0x6f0a el indice
+C 0x6f0d el siguiente
+C 0x6f0f y hasta el tercero
+C 0x6f15 el coche vuelve a estar entero
+C 0x6f18 estado 1, con 0x0C de cuenta
+C 0x6f1e y la velocidad, a cero
+L 0x6f25 frena_si_va_muy_rapido
+B 0x6f25 Por encima de 0xB8 de velocidad, apaga el segundo objeto del par.
+C 0x6f25 la velocidad
+C 0x6f28 por debajo de 0xB8, nada
+C 0x6f2b el primer objeto
+C 0x6f30 si esta vacio, tampoco
+C 0x6f32 y apaga el que sigue
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x5251 cruza_la_meta
+B 0x5251 A los 0x0F12 de recorrido se acaba la etapa: el coche pasa al estado 3 y suena el efecto 0x92. Es el tercero de los tres hitos del final -a 0x0F00 se suelta el rival, a 0x0F09 se pinta el arco de meta en el anillo y aqui se cruza-, y por eso los tres estan a nueve de distancia: nueve filas de anillo.
+C 0x5251 lo recorrido
+C 0x5254 el hito del final
+C 0x525a antes de eso, nada
+C 0x525b las banderas de la partida
+C 0x525e en demostracion no suena
+C 0x5260 el efecto de la meta
+C 0x5265 el estado 3
+C 0x5267 al coche
+L 0x526b sube_trece_sprites
+B 0x526b Las dos puertas del volcado de sprites: 0x34 bytes son los trece primeros y 0x78 los treinta, o sea la copia entera. Van de 0xE10E a 0x3B00, que es donde R5=0x76 pone la tabla de atributos.
+C 0x526b los trece primeros
+C 0x5270 o los treinta enteros
+C 0x5273 la copia en RAM
+C 0x5276 la tabla de atributos de sprite
+L 0x527d latido_de_la_retirada
+B 0x527d El latido de cuando ya no se juega: sigue volcando los sprites y moviendo lo que quedaba en la carretera, pero en vez de leer el mando va retirando los sprites hacia arriba.
+C 0x527d los treinta sprites
+C 0x528f once sprites
+C 0x5291 desde el tercero
+L 0x5294 retira_los_sprites
+B 0x5294 Retira los sprites de once en once: a cada uno le quita SEIS de la Y hasta dejarlo en la franja 0xC0..0xDF, que es donde el VDP ya no lo pinta. Como el coche ocupa dos sprites -la carroceria y su color- la Y se escribe tambien cuatro bytes mas alla. Cuando el ULTIMO llega a la franja, y solo entonces, se pasa al paso siguiente de la escena.
+C 0x5294 al byte de la Y
+C 0x5298 la Y de ahora
+C 0x5299 contra la franja de aparcado
+C 0x529d ya esta fuera
+C 0x529f y si no, seis mas arriba
+C 0x52a3 el sprite siguiente lleva la misma Y
+C 0x52a8 y al siguiente
+C 0x52ab que numero de sprite era
+C 0x52ac si es el ultimo, se acabo la retirada
+C 0x52b1 cuatro bytes por sprite
+C 0x52b3 al siguiente
+L 0x52b8 sortea_la_etapa
+B 0x52b8 La demostracion no empieza siempre por la primera etapa: se sortea entre la 1, la 2 y la 3 con el registro R de refresco de la memoria sumado al reloj del juego. El `cp 004h` deja el cuatro fuera, asi que nunca salen la 4, la 5 ni la 6.
+C 0x52b8 la vuelta, a cero
+C 0x52bd R, el contador de refresco: el azar del cartucho
+C 0x52c1 mas el reloj del juego
+C 0x52c5 uno de cuatro
+C 0x52c7 del 1 al 4
+C 0x52c8 y el 4 no vale
+C 0x52cc se queda en la primera
+C 0x52ce (0xE043), la etapa
+L 0x52d1 endereza_el_coche
+B 0x52d1 Con el coche en el estado 4 -derrapando- y el derrape ya por debajo de 0x15, mete 0x0C en (0xE008): los DOS bits de girar a la vez. Es lo unico que escribe ahi aparte de la lectura del mando, y L_6A70 lo copia tal cual a (0xE048).
+C 0x52d1 el estado del coche
+C 0x52d4 solo si venia derrapando
+C 0x52d8 lo que queda de derrape
+C 0x52db y solo cuando ya se esta acabando
+C 0x52df los dos bits de girar
+C 0x52e1 al mando, como si se pulsaran
+B 0x52e4 Mira si el coche se ha salido de la calzada. El borde sale de la casilla 19 de la cola del arcen, (0xE0AA): por ocho y mas 0x1A da la columna en pixeles. Si el coche esta a menos de siete de ahi, no pasa nada; si se ha ido, deja marcado en (0xE009) el bit del lado por el que se fue, con el bit 4 siempre puesto. Y (0xE009) es lo que `lee_el_mando_nuevo` toma por PULSADO ANTES, de modo que lo que se escriba aqui no contara como recien pulsado en el fotograma que viene.
+C 0x52e4 la casilla 19 de la cola del arcen
+C 0x52e7 quitando el modo, que va en los dos bits de abajo
+C 0x52e9 por ocho: cada casilla son ocho pixeles
+C 0x52ea y el ajuste
+C 0x52ed la x del coche
+C 0x52f1 con un pixel de margen
+C 0x52f3 dentro de siete, se da por bueno
+C 0x52f7 la x, otra vez
+C 0x52fa por que lado se ha ido
+C 0x52fb por la izquierda
+C 0x52ff o por la derecha
+C 0x5301 lo que habia pulsado antes
+C 0x5305 el bit 4, siempre
+C 0x5308 y ahi queda
+C 0x530c dentro de la calzada no se marca nada
+L 0x5545 calzada_de_la_etapa_2
+B 0x5545 La calzada de la ETAPA 2: sobre la de siempre pega CUATRO columnas que salen de una lista ciclica, la de 0x7DC5, que se recorre de cuatro en cuatro y vuelve a empezar en cuanto se topa con un 0xFF.
+C 0x5545 la calzada de siempre
+C 0x5548 por donde va la lista
+C 0x554b el byte de cierre
+C 0x554d si no lo es, sigue
+C 0x554f y si lo es, vuelta al principio
+C 0x5555 al principio de la fila nueva
+C 0x5558 cuatro columnas
+C 0x555d y ahi queda la lista
+L 0x5563 calzada_de_la_etapa_3
+B 0x5563 La calzada de la ETAPA 3, la unica que se dibuja entera desde BITS: veintidos columnas sacadas de una sola palabra de 16 bits, doce por un lado y diez por otro. Como la segunda pasada vuelve a cargar la MISMA palabra desde el principio, las columnas 12 a 21 repiten el dibujo de las diez primeras: la calzada sale simetrica sin gastar un byte de mas. La lista es la de 0x7C85 y se recorre de dos en dos.
+C 0x5563 al principio de la fila nueva
+C 0x5566 las doce primeras columnas
+C 0x5569 y diez mas
+C 0x556e por donde va la lista
+C 0x5571 la palabra siguiente
+C 0x5576 el byte de cierre
+C 0x557a vuelta al principio
+B 0x5580 El otro guion de la etapa 3, el que pega el puente. Cuando se acaba -0xFF- retrocede 0x30 y alterna entre los dos que hay, el de 0x7C23 y el de 0x7C54, cada uno con su cuenta y su paso. Ese vaiven es lo que hace que el puente se repita.
+C 0x5580 por donde va el guion
+C 0x5583 el byte de cierre
+C 0x5585 si no lo es, a copiar
+C 0x5587 0x30 atras
+C 0x558e la cuenta del guion
+C 0x5591 mientras quede, se alarga
+C 0x5594 la bandera del vaiven
+C 0x5598 se le da la vuelta
+C 0x559d el primer guion
+C 0x55a0 seis filas, de una en una
+C 0x55a6 o el segundo
+C 0x55a9 de dieciseis en dieciseis
+C 0x55ab y ahi queda
+B 0x55b3 El puente propiamente dicho: cuatro columnas del guion, SIETE de tile 0xD0 en medio y otras cuatro del guion, de la columna 4 a la 18. Las siete del centro no se escriben una a una: se pone el 0xD0 en la primera y un `ldir` que se solapa consigo mismo lo arrastra hasta el final, que es por lo que son siete y no las seis que dice el `ld c,006h`. Y dos filas de cada cuatro llevan un 0xD1 en la columna 11, la raya discontinua del centro.
+C 0x55b3 la columna 4 de la fila nueva
+C 0x55b6 cuatro columnas
+C 0x55b9 el guion
+C 0x55bf seis mas, que con el que ya esta puesto hacen siete
+C 0x55c3 el tile del centro del puente
+C 0x55c6 el `ldir` se pisa a si mismo y lo arrastra
+C 0x55c9 y otras cuatro del guion, desde la columna 15
+C 0x55cd ahi queda el guion
+C 0x55d0 la cuenta de filas
+C 0x55d5 una de cada cuatro
+C 0x55d7 en dos de las cuatro, nada
+C 0x55dc la columna 11
+C 0x55df la raya del centro
+C 0x55e4 al 0xFF le sigue la cuenta
+C 0x55e5 seis filas
+L 0x55e9 calzada_de_la_etapa_4
+B 0x55e9 La calzada de la ETAPA 4: siete columnas del perfil y su ESPEJO al otro lado. Los siete bytes se vuelven a leer, se les suma 0x0D -que es el salto de un tile a su version espejada- y se escriben HACIA ATRAS desde el final de la fila. Media calzada guardada, la otra media calculada.
+C 0x55e9 las siete columnas de la izquierda
+C 0x55ec siete atras, a releerlas
+C 0x55f0 las siete
+C 0x55f2 el final de la fila
+C 0x55f5 el tile de la izquierda
+C 0x55f6 su version espejada
+C 0x55f8 al otro lado
+C 0x55f9 y hacia atras
+B 0x5600 El guion de perfiles de las etapas 4 y 5. Un byte trae dos cosas: los dos bits de abajo eligen uno de los cuatro perfiles de la tabla de 0x569C y los seis de arriba dicen cuantas filas dura. Cada perfil empieza por su propia cuenta de repeticion y detras van sus filas de siete bytes.
+C 0x5600 lo que le queda al perfil
+C 0x5603 mientras quede, se repite
+C 0x5606 lo que le queda al tramo
+C 0x5608 mientras quede, el mismo perfil
+C 0x560a por donde va el guion
+C 0x5611 el byte
+C 0x5612 los seis bits de arriba
+C 0x5616 son la cuenta del tramo
+C 0x561a el byte, otra vez
+C 0x561e los dos de abajo eligen
+C 0x5620 por dos: son punteros
+C 0x5621 la tabla de perfiles
+C 0x5627 el perfil
+C 0x562b el primer byte es su cuenta
+C 0x5630 y ahi empieza
+C 0x5633 al principio de la fila nueva
+C 0x5636 siete columnas
+C 0x5639 por donde va el perfil
+C 0x563e y ahi queda
+L 0x5642 calzada_de_la_etapa_5
+B 0x5642 La calzada de la ETAPA 5: el mismo guion de perfiles que la 4 pero con la tabla de 0x56A4 y CUATRO columnas al otro lado en vez de siete. El tipo 3 es el unico que no escribe nada: se salta el espejo y solo adelanta el puntero.
+C 0x5642 el paisaje de los lados
+C 0x5645 y la calzada
+C 0x5648 por donde va este otro guion
+C 0x564b el byte de cierre
+C 0x564f lo que le queda al tramo
+C 0x5653 por donde va la lista
+C 0x5656 mientras quede, el mismo
+C 0x5658 el byte siguiente
+C 0x565e los seis de arriba
+C 0x5662 son la cuenta
+C 0x5665 los dos de abajo eligen
+C 0x5668 por dos: son punteros
+C 0x5669 la tabla de perfiles
+C 0x5673 y ahi queda
+C 0x5676 el juego alterno de registros, para no perder HL
+C 0x5677 por donde va la lista
+C 0x567b el tipo
+C 0x567d el 3 no escribe nada
+C 0x5685 solo adelanta cuatro
+C 0x568b cuatro columnas
+C 0x568d desde el final de la fila
+C 0x5690 el tile
+C 0x5692 y hacia atras
+C 0x5696 ahi queda el perfil
+L 0x56ac calzada_de_la_etapa_6
+B 0x56ac La calzada de la ETAPA 6: como la 3, la fila entera desde una palabra de bits, con la lista de 0x7FE4. La diferencia es la salida: vuelve por L_5534, que rehace las lineas de la calzada ENCIMA de lo que se acaba de pintar.
+C 0x56ac al principio de la fila nueva
+C 0x56af las doce primeras columnas
+C 0x56b2 y diez mas
+C 0x56b7 por donde va la lista
+C 0x56ba de dos en dos
+C 0x56bf el byte de cierre
+C 0x56c3 vuelta al principio
+C 0x56c9 y a rehacer las lineas encima
+B 0x56cc De una palabra de 16 bits saca B tiles, uno por bit, empezando por el de mas peso: el 1 pinta la calzada y el 0 el borde. La palabra se lee AL REVES -primero el byte alto- y no se toca en memoria, asi que llamar dos veces seguidas repite el mismo dibujo desde el principio.
+C 0x56cc doce por defecto
+C 0x56ce por donde va la lista
+C 0x56d1 el byte alto va primero
+C 0x56d5 la etapa
+C 0x56d8 la 3 tiene sus propios tiles
+C 0x56dc saca el bit de mas peso
+C 0x56e0 con el 1, la calzada
+C 0x56e4 con el 0, el borde
+C 0x56e6 a la fila nueva
+C 0x56e8 y el bit siguiente
+C 0x56eb el bit de mas peso
+C 0x56ef los tiles de la etapa 3
+L 0x573a vuelca_el_anillo
+B 0x573a Vuelca el anillo entero a la tabla de nombres: veinticuatro filas de VEINTIDOS columnas desde 0x3801, saltando 0x20 por fila porque la pantalla tiene 32. El anillo se recorre desde (0xE046), y al llegar a 0xE396 vuelve a 0xE186: eso es lo que hace que la carretera parezca no acabarse nunca. Las cinco columnas que sobran a cada lado son el marcador, que no se toca.
+C 0x573a la fila de arriba de la carretera
+C 0x573d veinticuatro filas
+C 0x573f por donde va el anillo
+C 0x5743 la cuenta, a salvo
+C 0x5747 el puerto de datos del VDP
+C 0x574b veintidos columnas
+C 0x574d el byte del anillo
+C 0x574e y al VDP
+C 0x5753 el final del anillo
+C 0x575d vuelta al principio: 0xE186
+C 0x5760 32 bytes por fila de pantalla
+C 0x5763 la cuenta, de vuelta
+C 0x5765 y la fila siguiente
+L 0x5768 arma_la_fila_de_un_tramo
+B 0x5768 La tercera puerta del paisaje, la de los tramos anchos: copia un tile de borde y detras un tramo de tres, seis o nueve bytes segun los dos bits del nibble alto del modo. Al agotarse la cuenta de (0xE07B) se pasa al par siguiente del guion.
+C 0x5768 la cuenta del tramo
+C 0x576c al acabarse, el par siguiente del guion
+C 0x576f por donde va el paisaje
+C 0x5772 el byte de cierre
+C 0x5776 vuelta al principio
+C 0x577c el margen del arcen
+C 0x577f la fila nueva
+C 0x5782 corrida ese margen
+C 0x5784 el tile del borde
+C 0x5786 el modo
+C 0x5789 su nibble alto
+C 0x578f uno de cuatro
+C 0x5790 dos menos, del reves
+C 0x5795 por tres
+C 0x5797 y eso se salta
+C 0x579a uno mas
+C 0x579c por tres, otra vez
+C 0x57a1 el tramo
+C 0x57a3 y ahi queda
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x585f pasa_al_tramo_de_paisaje_siguiente
+B 0x585f Saca del guion de paisaje el par siguiente -[modo, cuenta]- y monta el tramo: el nibble bajo del modo elige el dibujo en la tabla de 0x593A y, si vale 2, ademas cierra el arcen una casilla. Solo los modos 3 y 4 tienen anchura propia, que sale de la tabla de cuatro bytes de 0x58AB sumando el nibble alto.
+C 0x585f por donde va el guion
+C 0x5862 el modo y su cuenta
+C 0x586a y ahi queda el guion
+C 0x586d el modo
+C 0x5871 su nibble bajo
+C 0x5873 con el 2 se cierra el arcen
+C 0x5877 el margen
+C 0x587b por dos: son punteros
+C 0x587c la tabla de paisajes
+C 0x5882 el dibujo
+C 0x5886 y ahi arranca
+C 0x5889 el modo, otra vez
+C 0x588c solo el 3 y el 4
+C 0x5890 los demas no tienen anchura propia
+C 0x5893 el nibble bajo, a salvo
+C 0x5895 y el nibble alto
+C 0x589d los dos juntos
+C 0x589e la tabla de anchuras
+C 0x58a5 lo ancho que sale el tramo
+L 0x58af pega_un_tramo_de_calzada
+B 0x58af EL PEGADOR DE TRAMOS DE CALZADA. Cada OCHO filas del anillo se coge un byte del guion de (0xE073): el nibble bajo elige un tramo en la tabla de esta etapa y el nibble alto, por dos, dice en que columna va. El tramo empieza por sus dos medidas -lo ancho y cuantas veces se repite- y detras van sus filas seguidas, que se van gastando una por fila de anillo. Un 0xFF en el guion no lo cierra: deja la cuenta en ocho y sigue con lo que hubiera.
+C 0x58af la cuenta de las ocho filas
+C 0x58b3 al agotarse, el tramo siguiente
+C 0x58b5 las veces que se repite
+C 0x58b9 la ultima no se descuenta
+C 0x58bc una menos
+C 0x58bf la cuenta, de vuelta a ocho
+C 0x58c1 por donde va el guion
+C 0x58c4 el byte siguiente
+C 0x58c8 el byte
+C 0x58c9 si es 0xFF, no hay tramo
+C 0x58cc deshace el `inc a`
+C 0x58cd su nibble bajo
+C 0x58cf por dos: son punteros
+C 0x58d0 la tabla de tramos de la etapa
+C 0x58d6 el tramo
+C 0x58da las veces que se repite: `ld (nn),bc` guarda C delante, asi que B acaba en (0xE086)
+C 0x58dc y lo ancho que es, que es lo que acaba en (0xE085)
+C 0x58dd los dos de golpe, y cruzados
+C 0x58e2 y ahi empiezan sus filas
+C 0x58e7 con el 0xFF, ocho de golpe
+C 0x58ec por donde va el guion
+C 0x58ef si es 0xFF, no hay nada que pegar
+C 0x58f3 el nibble alto
+C 0x58f9 por dos
+C 0x58fa la fila nueva
+C 0x58fd y esa es la columna
+C 0x58ff lo ancho que es
+C 0x5905 por donde va el tramo
+C 0x5908 a la fila nueva
+C 0x590a y ahi queda
+L 0x590e apunta_el_arcen_de_esta_fila
+B 0x590e Corre la cola del arcen una casilla hacia abajo y mete la nueva por arriba, con el margen en los seis bits de arriba y el modo en los dos de abajo. Es la MEMORIA de por donde iba la calzada en cada una de las veinticuatro filas: sin ella, un objeto que lleva veinte filas cayendo no sabria a que altura esta el borde.
+C 0x590e la ultima casilla
+C 0x5911 una mas abajo
+C 0x5914 veintitres casillas
+C 0x5917 todas hacia abajo
+C 0x5919 el modo
+C 0x591c sus dos bits de abajo
+C 0x591f el margen
+C 0x5922 a los seis bits de arriba
+C 0x5927 la primera casilla, la de arriba
+C 0x5928 y ahi queda la fila nueva
+L 0x592a llena_la_fila_de_fondo
+B 0x592a Deja la fila nueva entera del tile de fondo de (0xE089), los veintidos bytes: es el lienzo sobre el que las seis calzadas pintan lo suyo.
+C 0x592a la fila nueva
+C 0x5930 el tile del fondo
+C 0x5934 veintiuna copias mas
+L 0x5944 pinta_el_rotulo_de_meta
+B 0x5944 A los 0x0F09 de recorrido EXACTOS pinta el rotulo de meta en el anillo, seis columnas dentro de la fila que sigue a la de arriba. En la etapa 6 no es el mismo: en vez de los once tiles de CHECK POINT van los cinco de GOAL, tres columnas mas a la derecha. Como la comparacion es de igualdad y no de mayor o igual, solo se pinta una vez.
+C 0x5944 lo recorrido
+C 0x5947 el hito del rotulo
+C 0x594d y solo justo en ese
+C 0x594e por donde va el anillo
+C 0x5951 una fila y seis columnas
+C 0x5956 CHECK POINT
+C 0x5959 once tiles
+C 0x595b la etapa
+C 0x595e la sexta es la ultima
+C 0x5962 y ahi pone GOAL
+C 0x5965 cinco tiles
+C 0x5967 tres columnas mas a la derecha
+C 0x596a al anillo
+L 0x597d baja_la_aguja
+B 0x597d La aguja del cuadro de mandos: lo recorrido por cuatro, el byte de arriba, y 0x6C menos eso es la Y del PRIMER sprite. O sea que la aguja va bajando segun se avanza en la etapa. Cada dieciseis fotogramas, ademas, le da la vuelta al bit 2 y al 1 de su color: eso es lo que la hace parpadear.
+C 0x597d lo recorrido
+C 0x5980 por cuatro
+C 0x5982 y el byte de arriba
+C 0x5983 el primer sprite de la copia
+C 0x5986 0x6C menos eso
+C 0x598a y esa es su Y
+C 0x598b el color de ese sprite
+C 0x598d el reloj del juego
+C 0x5990 uno de cada dieciseis
+C 0x5993 los dos bits del color
+C 0x5995 se les da la vuelta
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x6a70 mueve_el_coche
+B 0x6a70 La puerta de todo lo que le pasa al coche. Guarda el giro que se acaba de pulsar -si lo hay- y despacha por (0xE049) con la tabla de 0x6A80, que va pegada detras del `call` como las otras cinco del cartucho.
+C 0x6a70 lo recien pulsado
+C 0x6a73 solo los dos bits de girar
+C 0x6a75 el ultimo giro
+C 0x6a78 si no se ha pulsado nada, se deja el de antes
+C 0x6a7b (0xE049), el estado
+C 0x6a7d y detras del call, las ocho ramas
+L 0x6a90 coche_rodando
+B 0x6a90 El estado 0, el normal: el coche va rodando. Gira si el mando lo pide -y solo si el giro pulsado coincide con el que ya llevaba, que es lo que evita el cambio brusco-, deja sonando el motor y se dibuja de frente.
+C 0x6a90 mira el borde y los choques
+C 0x6a93 hacia donde va girado
+C 0x6a96 por cuatro
+C 0x6a9b lo que hay pulsado
+C 0x6a9e los dos bits de girar
+C 0x6aa0 y solo si coincide con el giro que llevaba
+C 0x6aa1 entonces se mueve de lado
+C 0x6aa4 las banderas de la partida
+C 0x6aa7 en demostracion no suena
+C 0x6aab si no hay otro efecto sonando
+C 0x6aaf el motor
+C 0x6ab4 de frente
+C 0x6ab5 hacia donde queda girado
+L 0x6abb coche_reventado
+B 0x6abb El estado 1: el coche ya ha reventado y esta ardiendo. Cada ocho fotogramas baja la cuenta de (0xE04A) y en el paso 0x0B suelta el efecto 0x4F; al llegar a cero pasa al estado 6. El `pop hl` de la entrada se come la vuelta, asi que esto no regresa a quien despacho.
+C 0x6abb se come la vuelta
+C 0x6abc el reloj del juego
+C 0x6abf uno de cada ocho
+C 0x6ac2 la cuenta de la quema
+C 0x6ac5 una menos
+C 0x6ac6 al acabarse, se retira
+C 0x6ac9 el paso en el que suena
+C 0x6acb el dibujo del coche ardiendo
+C 0x6acf el paso siguiente
+C 0x6ad2 y ahi cambia de dibujo
+C 0x6ad7 el efecto de la quema
+B 0x6adf El remate de la quema: frena de golpe restando 0x14 a la velocidad -con suelo en cero-, pasa al estado 6 y da 0x10 fotogramas de espera. Si todavia queda velocidad, se sale por el `pop hl`.
+C 0x6adf frena de golpe
+C 0x6ae2 el estado 6
+C 0x6ae7 y 0x10 fotogramas de espera
+C 0x6aec lo que quede de velocidad
+C 0x6af0 si ya es cero, se ha acabado la gasolina
+C 0x6af2 y si no, se come la vuelta
+C 0x6af4 la velocidad
+C 0x6af8 0x14 menos
+C 0x6afa si no se pasa, se queda
+C 0x6afc y si se pasa, a cero
+C 0x6aff el efecto que sonaba
+L 0x6b05 coche_gastandose
+B 0x6b05 El estado 2: como el 0 pero ademas gastando gasolina. Cada fotograma baja (0xE04F), la velocidad, y cuando se acaba se pasa al aviso de EMPTY.
+C 0x6b05 lo que quede de velocidad
+C 0x6b09 con velocidad, sigue rodando
+C 0x6b0c el coche normal
+C 0x6b0f la velocidad
+C 0x6b13 una menos
+C 0x6b14 y si se ha pasado de cero
+C 0x6b19 y si no, sigue
+L 0x6b1c se_acabo_la_gasolina
+B 0x6b1c Se acabo la gasolina. Suena el efecto 0x1B y se escribe EMPTY sobre la propia calzada, en la casilla del coche: la direccion sale de la posicion, y el `and 01fh / cp 012h` la corre a la izquierda si el rotulo no cabria dentro de las veintidos columnas del anillo. Despues, 0x80 fotogramas de espera y estado 6.
+C 0x6b1c si hay otro efecto sonando, no
+C 0x6b21 el efecto de la gasolina
+C 0x6b26 la x del coche
+C 0x6b2a y su Y
+C 0x6b2d 0x10 mas arriba
+C 0x6b31 y ocho a la izquierda
+C 0x6b34 de casilla a direccion de VRAM
+C 0x6b38 la columna
+C 0x6b3a si pasa de la 18, no cabe
+C 0x6b3e y se clava en la 18
+C 0x6b44 el rotulo EMPTY
+C 0x6b47 cinco tiles
+C 0x6b4a a la pantalla
+C 0x6b4d 0x80 fotogramas de espera
+C 0x6b52 y el estado 6
+C 0x6b57 se come la vuelta
+L 0x6b5e coche_retirandose
+B 0x6b5e El estado 3: el coche se va de la pantalla. Baja la Y de cuatro en cuatro hasta meterla en la franja 0xC8..0xCF, que es donde el VDP ya no lo pinta, y entonces -si no queda ningun rival en juego- enciende la bandera de demostracion.
+C 0x6b5e se come la vuelta
+C 0x6b62 los dos rivales, fuera
+C 0x6b6a de frente
+C 0x6b6d y sin velocidad
+C 0x6b71 la Y del coche
+C 0x6b75 contra la franja de aparcado
+C 0x6b79 ya esta fuera
+C 0x6b7c cuatro mas
+C 0x6b80 el primer rival
+C 0x6b84 si sigue en juego, se espera
+C 0x6b85 y el segundo
+C 0x6b8a la bandera de demostracion
+L 0x6b90 coche_derrapando
+B 0x6b90 El estado 4: el coche derrapa. (0xE0B1) es lo que le queda; al agotarse pasa al 7 -o al 0 si la velocidad no llega a 0xA0-, y mientras dura se va de lado y solo se endereza pulsando hacia el lado CONTRARIO al que se fue.
+C 0x6b90 lo que queda de derrape
+C 0x6b93 mientras quede, sigue derrapando
+C 0x6b96 por que lado se fue
+C 0x6b9a por un lado, siete
+C 0x6b9e por el otro, uno
+C 0x6ba1 el estado 7
+C 0x6ba7 la velocidad
+C 0x6baa por debajo de 0xA0 no hay trompo
+C 0x6bad y se vuelve al estado 0
+C 0x6bb0 se va de lado
+C 0x6bb3 y de paso mira el borde
+C 0x6bb9 las banderas de la partida
+C 0x6bbc en demostracion no suena
+C 0x6bc0 el reloj
+C 0x6bc3 uno de cada cuatro
+C 0x6bc5 el efecto del derrape
+C 0x6bca por que lado se fue
+C 0x6bce lo que se acaba de pulsar
+C 0x6bd3 se fue por un lado: se corrige con el otro
+C 0x6bd8 o al reves
+C 0x6bdb y vuelve al estado 0
+L 0x6be2 vete_de_lado
+B 0x6be2 Empuja el coche de lado durante el derrape: la fuerza sale de (0xE051) menos 0x0C, y si se fue por el otro lado se le da la vuelta al signo con el complemento a dos. El dibujo tambien cambia: el 7 o el 1 segun el lado.
+C 0x6be2 el dibujo de un lado
+C 0x6be7 lo que dura el trompo
+C 0x6bea menos 0x0C
+C 0x6bef por que lado se fue
+C 0x6bf5 el dibujo del otro lado
+C 0x6bfa el signo, negativo
+C 0x6bfc complemento a dos
+C 0x6bff la x del coche
+C 0x6c02 y ahi se le suma
+L 0x6c05 coche_en_trompo
+B 0x6c05 El estado 5: el trompo. (0xE004) dice lo que dura y (0xE051) lo que gira, que va bajando: el coche da vueltas cada vez mas despacio hasta pararse. Al acabarse pasa al estado 2 -o al 0 si ya no queda velocidad-.
+C 0x6c05 lo que dura el trompo
+C 0x6c08 al acabarse, se sale
+C 0x6c0b lo que gira
+C 0x6c0f si ya es cero, no baja mas
+C 0x6c12 y si no, una menos
+C 0x6c13 lo que gira
+C 0x6c14 la x del coche
+C 0x6c17 la mitad
+C 0x6c1a hacia donde va girado
+C 0x6c1d su bit de abajo dice el sentido
+C 0x6c1e y ahi se mueve
+C 0x6c24 lo que quede de velocidad
+C 0x6c28 el estado 2
+C 0x6c2c o el 0, sin velocidad
+L 0x6c31 coche_esperando
+B 0x6c31 El estado 6: no hace nada mas que esperar y apagar la bandera de fin de partida. Es el estado en el que se queda el coche mientras la escena remata.
+C 0x6c31 se come la vuelta
+C 0x6c32 espera y sale
+C 0x6c36 la bandera de "se acabo"
+L 0x6c3a coche_rebotando
+B 0x6c3a El estado 7: el coche rebota contra el borde. Cada cuatro fotogramas suena el efecto 0x0B y la cuenta de (0xE0B1) sube o baja segun el lado; los tres bits de abajo de esa cuenta son el dibujo, o sea que el coche va cambiando de postura solo. Si de paso toca otra vez el borde, se va al remate del golpe.
+C 0x6c3a se va de lado
+C 0x6c3d el reloj
+C 0x6c40 uno de cada cuatro
+C 0x6c42 la cuenta del rebote
+C 0x6c48 el efecto del golpe
+C 0x6c4e por que lado se fue
+C 0x6c51 una menos
+C 0x6c55 o dos mas, por el otro lado
+C 0x6c57 la cuenta
+C 0x6c58 sus tres bits de abajo son el dibujo
+C 0x6c5d la Y del coche
+C 0x6c60 mira el borde
+C 0x6c63 si no lo toca, se queda asi
+C 0x6c64 y si lo toca, al remate del golpe
+L 0x6c67 suelta_el_acelerador
+B 0x6c67 Sin el boton pulsado: la velocidad baja de una en una y el coche se mueve hacia atras en la pantalla, 0x48 de 256 por fotograma, mientras el byte alto de la Y no llegue a 0xF8.
+C 0x6c67 solo en los estados de rodar
+C 0x6c6b la velocidad
+C 0x6c6f si ya es cero, no baja mas
+C 0x6c71 una menos
+C 0x6c73 el acelerador, apagado
+C 0x6c77 la Y en punto fijo
+C 0x6c7b hasta el tope de arriba
+C 0x6c80 y solo en las franjas de velocidad que dejan
+C 0x6c84 0x48 de 256 hacia atras
+L 0x6c89 esta_rodando
+B 0x6c89 Dice si el coche esta en uno de los estados en los que se rueda de verdad: no el 1, no el 2 y no el 5. Devuelve con el cero puesto cuando NO se rueda.
+C 0x6c89 el estado
+C 0x6c8c el 1 no
+C 0x6c8e el 2 tampoco
+C 0x6c90 y el 5, el trompo
+L 0x6c93 deja_moverse
+B 0x6c93 EL FILTRO DEL DESPLAZAMIENTO VERTICAL, y no es lineal: por debajo de 0x18 el coche no se mueve, entre 0x18 y 0x50 si, entre 0x50 y 0x7E otra vez no, y por encima de 0x7E si. Esa franja muerta de en medio esta MEDIDA en el emulador: la Y se clava en 0x8FC0 mientras la velocidad va de 0x51 a 0x7D y vuelve a moverse en cuanto pasa de 0x7E.
+C 0x6c93 la velocidad
+C 0x6c96 por debajo de 0x18, quieto
+C 0x6c9a de 0x18 a 0x50, se mueve
+C 0x6c9d de 0x50 a 0x7E, quieto otra vez
+L 0x6ca1 pisa_el_acelerador
+B 0x6ca1 Con el boton pulsado: la velocidad sube de una en una hasta el tope de 0xD7 -MEDIDO: la demostracion lo alcanza y ahi se queda- y el coche avanza en la pantalla, 0x48 de 256 por fotograma, mientras el byte alto de la Y no llegue a 0x9A. Ese tope tambien esta medido.
+C 0x6ca1 solo en los estados de rodar
+C 0x6ca5 lo que hay pulsado
+C 0x6ca8 el bit 4 es el acelerador
+C 0x6caa sin el, se suelta
+C 0x6cac la velocidad
+C 0x6cb0 el tope
+C 0x6cb3 una mas
+C 0x6cb5 el acelerador, encendido
+C 0x6cba la Y en punto fijo
+C 0x6cbe hasta el tope de 0x9A
+C 0x6cc3 y solo en las franjas de velocidad que dejan
+C 0x6cc7 0x48 de 256 hacia delante
+C 0x6cca a la Y
+C 0x6ccb y ahi queda
+L 0x6cd1 mira_el_borde
+B 0x6cd1 Mira si el coche esta tocando el borde de la calzada. Si no, deja 0xFF en (0xE055); si si, deja la casilla y decide que pasa: con velocidad de 0xA0 para arriba, el golpe gordo; por debajo, trompo de 0x18 fotogramas con (0xE051) a 0xBC.
+C 0x6cd1 la Y del coche
+C 0x6cd4 busca el borde
+C 0x6cd7 la casilla tocada
+C 0x6cda 0xFF: no hay nada
+C 0x6cdc si no toca, se acabo
+C 0x6cdd y si toca, la casilla
+C 0x6cde que clase de golpe es
+C 0x6ce2 estado 1 y cuenta 0x0C
+C 0x6ce8 la velocidad
+C 0x6ceb de 0xA0 para arriba, el golpe gordo
+C 0x6cf0 y si no, el estado 5
+C 0x6cf5 con 0xBC de giro
+C 0x6cfa 0x18 fotogramas de trompo
+C 0x6cff y de frente
+C 0x6d04 se come DOS vueltas
+B 0x6d09 Clasifica el golpe por el tile que se ha leido de la pantalla: los cuatro primeros de la tanda mandan al derrape -estado 4, con 0x20 de cuenta- y los cuatro siguientes solo cortan la velocidad a 0x20 y sueltan el efecto. Devuelve con el cero puesto cuando se ha ocupado del golpe el mismo.
+C 0x6d09 el tile del golpe
+C 0x6d0c ocho tiles de margen
+C 0x6d10 los cuatro primeros
+C 0x6d14 el estado 4
+C 0x6d19 con 0x20 de derrape
+C 0x6d20 la velocidad, cortada a 0x20
+B 0x6d2a El borde de la IZQUIERDA. Lee el tile que hay cuatro pixeles a la izquierda del coche y, si esta en la tanda del arcen, afina hasta el pixel: redondea la x a la casilla y compara la parte que sobra. El 0xEC es un tile con su propia forma, y por eso se mira aparte.
+C 0x6d2a cuatro pixeles a la izquierda
+C 0x6d2c lee el tile de la pantalla
+C 0x6d2f si no hay borde, nada
+C 0x6d31 los tiles llenos chocan siempre
+C 0x6d35 y los del arcen se afinan
+C 0x6d3b la x del coche
+C 0x6d3d redondeada a la casilla
+C 0x6d43 lo que sobra
+C 0x6d45 contra el ancho del tile
+C 0x6d47 si no llega, no hay golpe
+C 0x6d49 golpe por la izquierda
+C 0x6d4e el tile de forma propia
+C 0x6d52 con su margen
+B 0x6d56 El borde de la DERECHA, igual que el de la izquierda pero al reves y con sus propios tiles: aqui el de forma propia es el 0xF3.
+C 0x6d56 cuatro pixeles a la derecha
+C 0x6d58 lee el tile de la pantalla
+C 0x6d5b si no hay borde, nada
+C 0x6d5d los tiles llenos chocan siempre
+C 0x6d61 y los del arcen se afinan
+C 0x6d67 la x del coche
+C 0x6d69 redondeada a la casilla
+C 0x6d6e el nibble bajo del tile
+C 0x6d73 cuatro mas
+C 0x6d78 golpe por la derecha
+C 0x6d7d el tile de forma propia
+C 0x6d85 sin golpe
+C 0x6d89 con golpe
+L 0x6d8b lee_el_tile_de_la_pantalla
+B 0x6d8b EL DETECTOR DE CHOQUES, y no usa geometria: LEE LA PANTALLA. Calcula la casilla en la que esta el coche, la pide al VDP con SETRD y se trae el tile que hay puesto ahi. Despues lo clasifica por tandas -por debajo de 0xCF hay golpe seguro, de 0xCF a 0xD8 esta libre, de 0xD9 a 0xE8 es el borde y hay que afinar-. Es la manera mas barata de que el coche choque con lo que se VE, sea lo que sea lo que la carretera haya pintado ahi.
+C 0x6d8b la Y del coche
+C 0x6d8e y su x
+C 0x6d8f cuatro pixeles al lado
+C 0x6d92 la vuelta del anillo
+C 0x6d96 con la Y en la franja de arriba
+C 0x6d98 la fila de arriba
+C 0x6d9c o la de abajo
+C 0x6d9e la x
+C 0x6da0 corrida lo que diga B
+C 0x6da2 de casilla a direccion de VRAM
+C 0x6da5 y se lo pide al VDP
+C 0x6da8 el puerto de datos
+C 0x6dad el tile que hay puesto ahi
+C 0x6db2 por debajo de 0xCF, golpe seguro
+C 0x6db6 de 0xCF a 0xD8, libre
+C 0x6dba y de 0xD9 en adelante
+C 0x6dbc dieciseis tiles de borde
+L 0x6dc1 busca_el_borde_de_la_calzada
+B 0x6dc1 De la Y del coche saca la fila del anillo, va a buscar a la cola del arcen el margen que le corresponde a esa fila y lo pasa a pixeles: por dos, redondeado a ocho y mas 0x20. Comparado con la x del coche, dice por que lado hay que mirar el borde.
+C 0x6dc1 la Y, a salvo
+C 0x6dc4 la vuelta del anillo
+C 0x6dc8 con la Y en la franja de arriba
+C 0x6dca dieciseis lineas
+C 0x6dce o la fila de abajo
+C 0x6dd1 la cola del arcen
+C 0x6dd4 la Y entre ocho: la fila
+C 0x6dd9 y esa es su casilla
+C 0x6ddd por dos
+C 0x6dde redondeado a ocho
+C 0x6de0 mas el ajuste
+C 0x6de2 la x del coche
+C 0x6de6 a la derecha del borde
+C 0x6de9 o a la izquierda
+L 0x6dec gira_el_coche
+B 0x6dec Mueve el coche de lado. La fuerza sale de (0xE051): sin trompo es cero y con trompo, la mitad mas ocho. Si estan pulsados LOS DOS giros a la vez -que es lo que deja 0x52D1- manda el ultimo que se pulso. Y la suma va al doble, porque L_6E14 desplaza DE antes de sumarlo.
+C 0x6dec la x del coche
+C 0x6def lo que dura el trompo
+C 0x6df3 sin trompo, la fuerza normal
+C 0x6df5 la mitad
+C 0x6df7 y ocho mas
+C 0x6dfa lo que hay pulsado
+C 0x6dfe los dos bits de girar
+C 0x6e00 si estan los dos
+C 0x6e04 manda el ultimo que se pulso
+C 0x6e08 el bit del sentido, al acarreo
+C 0x6e0b sin signo
+C 0x6e0d hacia un lado
+C 0x6e0f y hacia el otro, negativo
+C 0x6e11 complemento a dos
+C 0x6e14 por dos
+C 0x6e18 a la x
+C 0x6e19 y ahi queda
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x6f34 reparte_los_objetos
+B 0x6f34 El reparto: recorre las dos ranuras de 0xE0C3 y, de las que ya estan armadas, va bajando la cuenta de su campo +3 -a fotograma por vez, o a doble si la velocidad no llega a 0xC8- hasta que llega a cero. Entonces el objeto sale a la carretera.
+C 0x6f34 la ranura que toca
+C 0x6f38 por dieciseis
+C 0x6f41 y ahi queda apuntada
+C 0x6f45 su estado
+C 0x6f47 sin armar, a la ranura siguiente
+C 0x6f4b la cuenta que falta para soltarlo
+C 0x6f4d a cero: se suelta
+C 0x6f4f la velocidad
+C 0x6f52 a partir de 0xC8, cada fotograma
+C 0x6f56 y por debajo, uno de cada dos
+C 0x6f5c una menos
+C 0x6f5d la ranura
+C 0x6f60 la siguiente
+C 0x6f61 y son dos
+B 0x6f67 Una ranura que ya ha cumplido su cuenta. Antes de soltar el objeto se le pone otra vez la cuenta de espera, que depende del NIVEL: siete en el segundo y doce en el primero.
+C 0x6f67 la ranura
+C 0x6f6b la segunda
+C 0x6f70 o la primera
+C 0x6f72 el nivel
+C 0x6f76 en el segundo, siete
+C 0x6f7a y en el primero, doce
+B 0x6f7e Busca un hueco libre entre los dos objetos en juego: mira el campo +1 de cada uno y se queda con el primero que este a cero. Si los dos estan ocupados, el objeto no sale y la ranura se vuelve a intentar en el fotograma siguiente.
+C 0x6f7e el numero de hueco, a salvo
+C 0x6f7f el primer objeto
+C 0x6f82 por dieciseis
+C 0x6f88 el campo +1
+C 0x6f8c su estado
+C 0x6f8e a cero: hueco libre
+C 0x6f91 el hueco siguiente
+C 0x6f92 y son dos
+C 0x6f96 los dos ocupados: se deja para luego
+B 0x6f98 Coloca el objeto en la carretera. La Y sale del arcen de la fila de arriba -(0xE098)- por ocho, y despues se le va restando ocho a la x mientras el objeto siga cayendo fuera de la calzada: asi ninguno aparece encima del arcen.
+C 0x6f98 el hueco elegido
+C 0x6f99 apuntado
+C 0x6f9d el campo +4
+C 0x6fa3 el arcen de la fila de arriba
+C 0x6fa6 sin el modo
+C 0x6faa por ocho
+C 0x6fad mas lo que traia el campo
+C 0x6fb0 el campo +6, a cero
+C 0x6fb4 y ahi va la Y
+C 0x6fb8 mira si cae sobre la calzada
+C 0x6fbc si cae dentro, ya esta
+C 0x6fc0 y si no, ocho pixeles adentro
+C 0x6fc6 y se vuelve a mirar
+B 0x6fc8 El COLOR del objeto: por norma 0xF0, pero los tipos 2 y 5 llevan 0xBF -y solo si no estamos en la escena 6, la del choque-. Con el nivel a cero se le fuerza el tipo 0.
+C 0x6fc8 el objeto que se estaba armando
+C 0x6fcb su tipo
+C 0x6fcc el nivel
+C 0x6fd2 en el primero, el tipo 0
+C 0x6fd3 el campo +6
+C 0x6fd9 el tipo 2
+C 0x6fdb el color de siempre
+C 0x6fdf o el 5
+C 0x6fe3 la escena
+C 0x6fe6 en la del choque, no
+C 0x6fea y a esos dos, el otro color
+B 0x6fec Copia la ranura entera -los dieciseis bytes- al hueco, deja su campo +1 a cero y le pone al sprite los dos colores que le tocan por tipo, sacados de la tabla de 0x536B. Si todavia quedan objetos por soltar en este tramo, vuelve al reparto; si no, se pasa al tramo siguiente.
+C 0x6fec el objeto
+C 0x6fef el hueco
+C 0x6ff1 los dieciseis bytes
+C 0x6ff6 el objeto, otra vez
+C 0x6ff9 su tipo
+C 0x6ffb y el campo +1, a cero
+C 0x6ffd por dos: son pares
+C 0x6ffe la tabla de colores por tipo
+C 0x7004 el numero de hueco
+C 0x7007 por ocho
+C 0x700a y tres, que es donde va el color
+C 0x700c la copia de atributos de sprite
+C 0x7012 el color del primer sprite
+C 0x7017 y el del segundo, cuatro mas alla
+C 0x7019 los que quedan del tramo
+C 0x701d si queda alguno, sigue el reparto
+L 0x7020 pasa_al_tramo_siguiente
+B 0x7020 Avanza (0xE0BD) por la lista ciclica de tramos de la etapa, y al topar con el 0xFF vuelve al principio de la fila de esa etapa en el plan de 0x537D. **Aqui es donde se nota la diferencia entre las dos compilaciones**: el byte 0x53CB pertenece a esta lista, y si es 0xFF la etapa 5 juega catorce tramos por ciclo en vez de quince.
+C 0x7020 por donde va la lista
+C 0x7023 el tramo siguiente
+C 0x7027 el byte de cierre
+C 0x7029 si no lo es, sigue
+C 0x702b la etapa
+C 0x7032 por dieciseis: una fila por etapa
+C 0x7036 el plan de las etapas
+C 0x703a y vuelta al principio de su fila
+B 0x703d Arma el tramo: el valor de la lista indexa la tabla de quince registros de 0x5311, que van de seis en seis. Con el nivel a cero el tramo 0x0A se cambia por el 9: el primer nivel se salta uno de los quince.
+C 0x703d el nivel
+C 0x7041 el tramo
+C 0x7044 el tramo 0x0A
+C 0x7048 en el primer nivel, el 9
+C 0x7049 la tabla arranca en el 1
+C 0x704a por dos
+C 0x704d y por tres: seis por registro
+C 0x704e la tabla de tramos
+C 0x7055 dos objetos por tramo
+C 0x705a y la ranura, la primera
+B 0x705f Vuelca los tres campos de un registro en su ranura. El del medio -lo que el objeto se mueve de lado- se DOBLA si el nivel no es el segundo, y la velocidad de arranque sale de la etapa: 0x80 por norma, 0x6C en la tercera y 0xE4 para los tipos 2 y 5.
+C 0x705f el tipo, a salvo
+C 0x7062 el tipo, al objeto
+C 0x7064 el campo +1, a uno
+C 0x7069 el nivel
+C 0x706d lo que se mueve de lado
+C 0x7070 doblado, salvo en el segundo nivel
+C 0x7071 al campo +3
+C 0x7074 y lo que se mueve hacia delante
+C 0x7077 cuatro campos mas alla
+C 0x707b el tipo, de vuelta
+C 0x707d la etapa
+C 0x7080 la tercera va mas despacio
+C 0x7082 la velocidad de siempre
+C 0x7086 y la de la tercera
+C 0x7089 los tipos 2
+C 0x708d y 5
+C 0x7091 van mucho mas rapido
+C 0x7093 el tipo, otra vez
+C 0x7095 el campo siguiente, a cero
+C 0x7097 y al objeto siguiente
+C 0x709d la ranura
+C 0x70a0 la siguiente
+C 0x70a3 y son dos
+L 0x70a8 mueve_los_objetos
+B 0x70a8 Recorre los dos objetos en juego y despacha cada uno por su campo +1 con la tabla de ocho de 0x70C9. El detalle: 0x728A se APILA antes del `call`, de modo que sea cual sea la rama, todas vuelven ahi.
+C 0x70a8 desde el primero
+C 0x70ac el objeto que toca
+C 0x70b1 por dieciseis
+C 0x70b9 y ahi queda apuntado
+C 0x70bd su estado
+C 0x70bf a cero: hueco libre
+C 0x70c2 la vuelta, apilada a mano
+C 0x70c6 y detras del call, las ocho ramas
+B 0x70e5 El latido de un objeto suelto: se mueve, mira si choca, y su empuje lateral sale del arcen de SU fila -no de la del coche-, con la fuerza del campo +9 contra la velocidad del jugador. Los dos bits de abajo del arcen dicen hacia donde.
+C 0x70e5 mira si toca al coche
+C 0x70e8 y si toca el borde
+C 0x70eb lo mueve hacia delante
+C 0x70ee el campo +6, su Y
+C 0x70f3 la vuelta del anillo
+C 0x70f7 la fila de arriba
+C 0x70fb y si no, la fila que le toca
+C 0x7102 la cola del arcen
+C 0x7106 el arcen de su fila
+C 0x7107 el campo +9, su velocidad
+C 0x710d los dos bits del modo
+C 0x7110 sin modo no se mueve de lado
+C 0x7113 la velocidad del jugador
+C 0x7116 contra la suya
+C 0x7119 en valor absoluto
+C 0x711b por dos
+B 0x7123 Pasados los 0x0F09 de recorrido -o sea, con la meta ya pintada- los objetos que estan sobre el borde se apartan: se les pone el campo +0xF a cero y se les da un empuje de 0x02F0 hacia dentro.
+C 0x7123 lo recorrido
+C 0x7127 el hito de la meta
+C 0x712d antes de eso, nada
+C 0x712e el campo +6
+C 0x7133 mira el borde
+C 0x7136 si no lo toca, nada
+C 0x7137 el objeto
+C 0x713e el campo +0xF, a cero
+C 0x7140 el empuje
+C 0x7145 el lado
+C 0x7148 hacia el otro lado
+C 0x7149 complemento a dos
+C 0x714f y al campo +8, la x
+B 0x7154 Lo mueve hacia delante: la diferencia entre la velocidad del jugador y la suya, por ocho, sumada a su Y. Por eso los que van mas despacio que el coche bajan por la pantalla y los que van mas rapido suben.
+C 0x7154 el campo +9, su velocidad
+C 0x715d la velocidad del jugador
+C 0x7162 menos la suya
+C 0x7164 por ocho
+C 0x7168 y al campo +6, la Y
+B 0x716d Solo para los objetos del tipo 3: si el coche se le acerca a menos de 0x20 por delante, el objeto se pone a huir hacia el lado contrario al que viene el coche -campo +0xE- y pasa al estado 5.
+C 0x716d el objeto
+C 0x7170 su tipo
+C 0x7171 solo el 3
+C 0x7174 el campo +6, su Y
+C 0x7178 la Y del coche
+C 0x717b 0x40 por delante
+C 0x717e si esta mas lejos, nada
+C 0x7181 y 0x20 por detras
+C 0x7187 la x del coche
+C 0x718a contra la suya
+C 0x7191 se aparta hacia un lado
+C 0x7195 o hacia el otro
+C 0x7196 al campo +0xE
+C 0x7198 con 0x20 de cuenta
+C 0x719a y al estado 5
+C 0x719c el objeto
+C 0x71a0 su estado nuevo
+B 0x71a2 El estado 5, el del objeto que huye: mientras le quede cuenta en el campo +0xF se aparta a un lado y frena; al agotarse o al tocar el borde, vuelve al estado 1.
+C 0x71a2 el campo +6
+C 0x71a4 mira el borde
+C 0x71aa si lo toca, se acabo
+C 0x71ac el campo +0xF
+C 0x71b1 una menos
+C 0x71b2 al agotarse, tambien
+C 0x71b5 hacia que lado se aparta
+C 0x71b6 un pixel entero
+C 0x71bc y frena
+C 0x71c2 vuelve al estado 1
+B 0x71c6 El choque de un objeto CONTRA EL OTRO. Solo lo mira el que va a mas de 0xD7 de velocidad, y con margenes distintos por eje: 0x20 a lo largo y 0x10 a lo ancho. Los dos pasan al estado 7 con 0x18 de cuenta, cada uno apartandose hacia su lado.
+C 0x71c6 el campo +9, su velocidad
+C 0x71cd por debajo de 0xD7 no choca con nadie
+C 0x71d1 cual de los dos se esta mirando
+C 0x71d4 el primer objeto
+C 0x71da o el segundo
+C 0x71dc el campo +8, la x
+C 0x71e0 la del otro
+C 0x71e3 con 0x20 de margen
+C 0x71e7 si no se solapan, nada
+C 0x71ec la Y del otro
+C 0x71ed con 0x10 de margen
+C 0x71f4 y si tampoco, nada
+C 0x71f5 por que lado se ha tocado
+C 0x71fc el otro objeto
+C 0x7201 el lado por el que sale
+C 0x7203 con 0x18 de cuenta
+C 0x7205 y al estado 7
+B 0x7209 El estado 7, el del objeto que rebota: se aparta a un lado mientras le quede cuenta en el campo +0xE, con empuje 0xB8 si es del tipo 5 y 0xA0 si no. Al acabarse, vuelve al estado 1.
+C 0x7209 el objeto
+C 0x720d su tipo
+C 0x720e el campo +0xE
+C 0x7212 una menos
+C 0x7213 al pasarse de cero, se acabo
+C 0x7218 el empuje del tipo 5
+C 0x721f y el de los demas
+C 0x7221 hacia que lado
+C 0x7226 y sigue con el latido normal
+B 0x7229 Dibuja el objeto, y los de los tipos 6 y 7 llevan un segundo sprite 0x10 pixeles mas abajo: son los que ocupan dos casillas de alto.
+C 0x7229 el primer sprite
+C 0x722d el tipo 6
+C 0x7231 o el 7
+C 0x7234 0x10 pixeles mas abajo
+C 0x7239 y cuatro patrones mas alla
+C 0x723b el sitio del segundo sprite
+C 0x7242 su color
+C 0x7248 y el del primero
+B 0x724b Deja el objeto en la copia de atributos de sprite. Los tipos 2 y 4 PARPADEAN: cada cuatro fotogramas se les sube la Y en uno, que es lo que hace que se vean temblando. Con la Y en 0xD0 no se escribe nada, porque 0xD0 es el valor que le dice al VDP que ahi se acaban los sprites.
+C 0x724b el objeto
+C 0x724f su tipo
+C 0x7252 el campo +6, su Y
+C 0x7258 el tipo 2
+C 0x725c o el 4
+C 0x7260 el reloj
+C 0x7263 uno de cada cuatro
+C 0x7267 y un pixel mas abajo
+C 0x726a el campo +8, su x
+C 0x726b cual de los dos es
+C 0x726e su sitio en la copia
+C 0x7272 0xD0 le corta al VDP la lista de sprites
+C 0x7276 la tabla de patrones por tipo
+C 0x727d el primer sprite
+C 0x7280 y el segundo, cuatro patrones mas alla
+C 0x7282 la fila
+C 0x7284 la columna
+C 0x7286 el patron
+C 0x7288 y al sprite siguiente
+B 0x728a La vuelta comun de las ocho ramas, la que se apilo antes del `call`. Dibuja el objeto y, si su Y ha entrado en la franja 0xC3..0xCE, lo retira: le pone 0xDF de Y y lo deja libre.
+C 0x728a dibujalo
+C 0x728d el campo +6, su Y
+C 0x7292 la franja de retirada
+C 0x7296 si ha entrado, se retira
+C 0x7298 cual se estaba mirando
+C 0x729b el siguiente
+C 0x729e y son dos
+C 0x72a4 fuera de la pantalla
+C 0x72a7 y el hueco, libre
+C 0x72aa dibujado por ultima vez
+B 0x72b8 El aviso de que viene un objeto del tipo 1: si el coche esta a menos de ocho pixeles de el y va a mas de 0x90, suena el efecto 9. En demostracion no suena.
+C 0x72b8 las banderas de la partida
+C 0x72bb en demostracion no
+C 0x72be el estado del coche
+C 0x72c1 reventado, no
+C 0x72c3 ni en trompo
+C 0x72c6 el objeto
+C 0x72c9 su tipo
+C 0x72ca solo el 1
+C 0x72cc el campo +6, su Y
+C 0x72d1 la Y del coche
+C 0x72d4 con ocho pixeles de margen
+C 0x72db si esta mas lejos, nada
+C 0x72dc la velocidad
+C 0x72df por debajo de 0x90, tampoco
+C 0x72e2 el efecto del aviso
+L 0x72e7 suma_al_campo
+B 0x72e7 Le suma DE a la palabra de 16 bits que acaba en el campo C del objeto en curso. Junto con L_72F6 es todo el acceso a los objetos que hay en el cartucho: por eso el `ld c,006h` -la Y- y el `ld c,009h` -la velocidad- salen por todas partes.
+C 0x72e7 el campo
+C 0x72eb su byte alto
+C 0x72ed y el bajo
+C 0x72ef la suma
+C 0x72f2 y ahi queda
+L 0x72f6 campo_del_objeto
+B 0x72f6 Traeme el campo C del objeto que se esta mirando. Deja HL apuntandolo y su valor en A.
+C 0x72f8 el objeto en curso
+C 0x72fb mas el numero de campo
+B 0x72fe El choque de un objeto CONTRA EL COCHE, con margenes 0x20 a lo largo y 0x14 a lo ancho. Solo lo miran los que van a 0xD7 o mas.
+C 0x7302 su estado
+C 0x7304 libre, nada
+C 0x7305 el campo +9, su velocidad
+C 0x730a por debajo de 0xD7 no golpea
+C 0x7310 cual se esta mirando
+C 0x7313 el primer objeto
+C 0x7319 o el segundo
+C 0x731b su Y
+C 0x731d con 0x20 de margen
+C 0x7321 si no se solapan, nada
+C 0x7326 y ahora la x
+C 0x7328 con 0x14
+C 0x732c si tampoco, nada
+C 0x732f por que lado ha sido
+C 0x7334 el otro
+C 0x7335 siete campos atras
+C 0x7339 mira que le pasa al coche
+C 0x733e el objeto
+C 0x7342 al estado 2
+C 0x7344 y hacia el lado contrario
+C 0x7347 el campo +0xE
+C 0x734d el lado
+C 0x734f con 0x10 de cuenta
+B 0x7352 Lo que le pasa al COCHE cuando un objeto le golpea: si estaba en un estado de rodar -6 o 7- no pasa nada, y si no, pasa al estado 2 con 0x0C de cuenta y apartandose hacia el lado del golpe.
+C 0x7353 el estado del coche
+C 0x7355 los estados 6 y 7
+C 0x735a en esos no pasa nada
+C 0x735b y si ya estaba tocado, tampoco
+C 0x735f al estado 2
+C 0x7361 trece campos mas alla
+C 0x7365 el lado del golpe
+C 0x7367 con 0x0C de cuenta
+L 0x736b sitio_del_sprite
+B 0x736b El sitio que le toca al objeto A en la copia de atributos de sprite: ocho bytes por objeto desde 0xE11A, o sea dos sprites cada uno.
+C 0x736b por ocho
+C 0x736e la copia de atributos
+L 0x7374 gasta_gasolina
+B 0x7374 Sube el contador de 0xE056 con un paso que depende del NIVEL: 0x0180 en el primero y 0x01FF en el segundo. En el segundo se gasta mas deprisa. Con el coche reventado no cuenta.
+C 0x7374 el estado del coche
+C 0x7378 reventado, no cuenta
+C 0x7379 el paso del segundo nivel
+C 0x737c el nivel
+C 0x7382 y el del primero, mas corto
+C 0x7384 el contador
+C 0x7388 y ahi queda
+L 0x738c cuentakilometros
+B 0x738c EL CUENTAKILOMETROS: suma la velocidad a (0xE077) y, cada vez que ese byte desborda, sube uno lo recorrido de (0xE078). Asi la etapa se mide en distancia y no en tiempo: los 0x0F12 del final llegan antes si se va rapido. De paso guarda la velocidad en (0xE051), salvo en trompo, que es cuando ese hueco lo usa el giro.
+C 0x738c la fraccion de lo recorrido
+C 0x738f la velocidad
+C 0x7392 sumada
+C 0x7394 sin desbordar, nada mas
+C 0x7399 lo recorrido
+C 0x739c uno mas
+C 0x73a0 el estado del coche
+C 0x73a3 en trompo (0xE051) es el giro
+C 0x73a5 y si no, la velocidad
+C 0x73aa se guarda ahi
+L 0x73ad barra_de_velocidad
+B 0x73ad La aguja de SPEED, dibujada de arriba abajo en la columna 0x3AD8: la velocidad se parte en tramos de 0x20 y cada tramo pinta tres tiles de la tabla de 0x73FC, subiendo 0x20 de VRAM por fila. Lo que sobra se rellena con los tres tiles de 0x7408 hasta llegar a la fila 0x39.
+C 0x73ad la velocidad
+C 0x73b0 la columna de SPEED
+C 0x73b2 la fila de abajo
+C 0x73b5 a cero no se pinta nada
+C 0x73b8 los tres bits de arriba
+C 0x73ba un tramo de 0x20
+C 0x73bc y si no llega, lo que quede
+C 0x73be los tiles de la barra
+C 0x73c2 los tres ultimos: la barra llena
+C 0x73c7 tres tiles por fila
+C 0x73cd una fila mas arriba
+C 0x73d4 lo que quedaba
+C 0x73d5 en tramos de ocho
+C 0x73d8 uno de cuatro
+C 0x73db por tres
+C 0x73dd los tiles de la barra
+C 0x73e3 tres tiles
+C 0x73e9 una fila mas arriba
+C 0x73ed hasta la fila 0x39
+C 0x73f1 y el resto, en blanco
+L 0x7411 baja_la_gasolina
+B 0x7411 EL DEPOSITO. Cada vez que el bit 5 de (0xE057) cambia -o sea, cada 0x20 pasos del contador de 0x7374- baja uno (0xE083), y al llegar a cero el coche pasa al estado 2, el que gasta velocidad hasta pararse. Con menos de 0x10 en el deposito suena el efecto 2, que es el aviso de reserva.
+C 0x7411 el contador
+C 0x7414 su bit 5
+C 0x7418 y como estaba
+C 0x741d si no ha cambiado, nada
+C 0x7420 se apunta
+C 0x7423 el deposito
+C 0x7424 vacio ya
+C 0x7427 uno menos
+C 0x7429 y si se acaba de vaciar
+C 0x742c el estado del coche
+C 0x742f al 2
+C 0x7431 dibuja el deposito
+C 0x7434 lo que queda
+C 0x7437 de 0x10 para arriba, sin aviso
+C 0x743a si hay otro efecto sonando, tampoco
+C 0x743f el aviso de reserva
+C 0x7444 el deposito
+C 0x7447 la columna de FUEL
+C 0x7449 la misma barra que la velocidad
+L 0x744c monta_la_pantalla_de_la_meta
+B 0x744c Monta la pantalla del final de etapa: descomprime sus patrones en 0x2400 y sus colores en 0x0400, pega el rectangulo de 21 por 5 tiles y copia los ocho bytes de 0x7475 sobre las variables del coche, que lo dejan en la Y 0xA8 y la x 0x63.
+C 0x744c los patrones
+C 0x7452 los tres tercios
+C 0x7455 y los colores
+C 0x745e la tabla de nombres
+C 0x7464 21 filas de 5
+C 0x746a las variables del coche
+C 0x7470 ocho bytes
+L 0x747d entra_el_coche_en_la_etapa
+B 0x747d El paso 2 del final de etapa: baja la Y del coche de uno en uno -o sea, lo sube por la pantalla- hasta que iguale el byte de su etapa en la tabla de 0x74B6. Como esos bytes van bajando de etapa en etapa -0x8B, 0x71, 0x54, 0x3A, 0x1B, 0x00-, cada etapa lo hace subir un trecho mas largo.
+C 0x747d dibujalo
+C 0x7480 la etapa
+C 0x7484 la tabla de alturas
+C 0x748e un pixel mas arriba
+C 0x748f hasta la altura de su etapa
+C 0x7492 y al paso siguiente
+L 0x7495 parpadea_el_coche
+B 0x7495 El paso 3: el coche parpadea. El bit 4 de la cuenta atras alterna su Y entre 0xC8 -fuera, debajo del borde- y la altura de su etapa, asi que se enciende y se apaga cada dieciseis fotogramas hasta que la cuenta se agota.
+C 0x7495 dibujalo
+C 0x7498 la cuenta atras
+C 0x749b al acabarse, al paso siguiente
+C 0x749e el bit 4
+C 0x74a0 con el puesto, fuera de la pantalla
+C 0x74a4 y sin el, a la altura de su etapa
+C 0x74af la Y del coche
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x5716 corre_el_anillo
+B 0x5716 CADA FOTOGRAMA, LA CARRETERA AVANZA AQUI. Retrocede el puntero del anillo veintidos posiciones -una fila entera- y mete en el hueco que queda la fila nueva de 0xE058. No se mueve un solo byte de paisaje: lo que se mueve es por donde empieza a leerse, y el volcado a la pantalla ya hace el resto. Los limites cuadran con la geometria que estaba medida: 0xE186 menos 22 da 0xE170, que es lo que se compara, y 0xE380 mas 22 da 0xE396, el final del anillo.
+C 0x5716 por donde va el anillo
+C 0x5719 veintidos atras: una fila
+C 0x571d y ahi queda
+C 0x5720 0xE186 menos 22: antes del principio
+C 0x5726 si no se ha pasado, se queda
+C 0x5728 y si se ha pasado, al final del anillo
+C 0x572e por donde va ahora
+C 0x5732 la fila nueva
+C 0x5735 veintidos columnas
+C 0x5738 y al anillo

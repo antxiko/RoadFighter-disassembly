@@ -1,0 +1,8 @@
+# Zonas que NO son codigo aunque el trazado pueda entrar en ellas.
+#
+# Se van anadiendo segun el trazado las descubre: tablas de words en linea
+# detras de un call, guiones de dibujo, bloques graficos.
+
+# La cabecera del cartucho: "AB" y las cuatro direcciones de la ROM (INIT,
+# STATEMENT, DEVICE, TEXT), mas los seis bytes reservados. No es codigo.
+0x4000 0x4010

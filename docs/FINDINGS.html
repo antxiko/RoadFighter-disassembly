@@ -1,0 +1,137 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Findings — Road Fighter (Konami, 1985)</title>
+<style>
+:root{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;--linea:#23262e;
+  --rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
+@media (prefers-color-scheme:light){:root{--tinta:#191a1e;--suave:#5a5d66;--fondo:#e9e7e1;
+  --panel:#f7f6f2;--linea:#d0cdc5;--rojo:#b23f34;--cyan:#1c6b7c;--verde:#2b7734;--oro:#8a7420}}
+:root[data-theme="dark"]{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;
+  --linea:#23262e;--rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
+:root[data-theme="light"]{--tinta:#191a1e;--suave:#5a5d66;--fondo:#e9e7e1;--panel:#f7f6f2;
+  --linea:#d0cdc5;--rojo:#b23f34;--cyan:#1c6b7c;--verde:#2b7734;--oro:#8a7420}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--tinta);padding:0 1.25rem 6rem;
+  font:15px/1.7 ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+.w{max-width:1120px;margin:0 auto}
+.n{max-width:68ch}
+h1,h2,h3,h4{font-weight:400;text-wrap:balance}
+a{color:var(--cyan)}
+img{image-rendering:pixelated;max-width:100%;height:auto;display:block}
+header.top{display:flex;flex-direction:column;align-items:center;gap:1.5rem;
+  padding:4rem 0 2rem;text-align:center}
+header.top img{width:min(100%,642px)}
+.claim{max-width:60ch;color:var(--suave);font-size:1.05rem}
+.claim b{color:var(--tinta);font-weight:400}
+.ficha{display:flex;flex-wrap:wrap;justify-content:center;gap:0 1.5rem;width:100%;
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--suave);
+  border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);padding:.85rem 0}
+.ficha b{color:var(--rojo);font-weight:400}
+nav{display:flex;flex-wrap:wrap;gap:1.25rem;justify-content:center;padding:1.25rem 0;
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+nav a{color:var(--suave);text-decoration:none;border-bottom:1px solid transparent}
+nav a:hover,nav a:focus{color:var(--tinta);border-bottom-color:var(--rojo)}
+nav.docs{border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);
+  margin-bottom:1rem}
+section{margin-top:4.5rem;scroll-margin-top:1rem}
+section>h2{font-size:1rem;letter-spacing:.1em;text-transform:uppercase;
+  border-left:3px solid var(--rojo);padding-left:.9rem;margin:0 0 1.5rem}
+.cifras{display:grid;gap:1px;background:var(--linea);border:1px solid var(--linea);
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.cifra{background:var(--panel);padding:1.1rem}
+.cifra b{display:block;font-size:1.7rem;color:var(--oro);font-weight:400;
+  font-variant-numeric:tabular-nums;line-height:1.2}
+.cifra span{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--suave)}
+.hall{border-top:1px solid var(--linea);padding-top:1.75rem;margin-top:2.5rem}
+.hall:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.hall h3{margin:0 0 .75rem;font-size:1.15rem;color:var(--rojo)}
+.hall h4{color:var(--oro);margin:1.5rem 0 .5rem;font-size:.95rem}
+.hall p{margin:0 0 1rem}
+pre.asm{background:var(--panel);border-left:2px solid var(--verde);margin:1.25rem 0;
+  padding:1rem 1.1rem;overflow-x:auto;font-size:13px;line-height:1.6;color:var(--tinta)}
+.par{display:grid;gap:1.25rem;grid-template-columns:1fr}
+@media(min-width:820px){.par{grid-template-columns:1fr 1fr}}
+.par figure{margin:0}
+table{border-collapse:collapse;width:100%;margin:1.25rem 0;font-size:13px;display:block;
+  overflow-x:auto}
+th,td{text-align:left;padding:.5rem .75rem;border-bottom:1px solid var(--linea)}
+th{color:var(--suave);font-weight:400;font-size:11px;letter-spacing:.07em;text-transform:uppercase}
+td.num{font-variant-numeric:tabular-nums;color:var(--oro)}
+.nivel{margin-top:2rem}
+.nivel h3{margin:0 0 .9rem;font-size:.95rem;letter-spacing:.06em;text-transform:uppercase}
+.nivel em{color:var(--cyan);font-style:normal}
+.sep{color:var(--suave);margin:0 .6rem}
+.rejilla{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.rejilla figure{margin:0;background:var(--panel);box-shadow:0 0 0 1px var(--linea)}
+.rejilla figcaption{display:flex;justify-content:space-between;padding:.45rem .65rem;
+  font-size:11px;color:var(--suave);border-top:1px solid var(--linea)}
+.dir{font-variant-numeric:tabular-nums;color:var(--verde)}
+footer{margin-top:5rem;padding-top:1.5rem;border-top:1px solid var(--linea);
+  color:var(--suave);font-size:12px}
+
+/* Aviso de trabajo en curso: tiene que verse antes que las cifras, porque un
+   100% mal leido hace mas dano que no ponerlo. */
+.aviso{background:#3a2a10;border-left:3px solid var(--oro);margin:1.5rem auto;
+  padding:1rem 1.2rem;max-width:900px;border-radius:4px}
+.aviso p{margin:0;color:var(--tinta);font-size:15px;line-height:1.65}
+.galeria{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:1.5rem;margin:1.5rem 0}
+.galeria figure{margin:0}
+.galeria img{width:100%;height:auto;image-rendering:pixelated;
+  border:1px solid var(--linea);border-radius:3px}
+.galeria figcaption{color:var(--suave);font-size:13px;margin-top:.5rem}
+audio{display:block;width:100%;max-width:640px;margin:.75rem 0 1.5rem}
+</style>
+<div class="w"><nav class="top"><a href="index.html">Home</a><a href="GETTING-STARTED.html">Start</a><a href="THE-GAME.html">The game</a><a href="THE-CARTRIDGE.html">The cartridge</a><a href="THE-CODE.html">The code</a><a href="FINDINGS.html" style=color:var(--tinta)>Findings</a><a href="IN-THE-EMULATOR.html">In the emulator</a><a href="OPEN-QUESTIONS.html">Open questions</a><a href="es/HALLAZGOS.html" style="margin-left:auto;color:var(--oro)">Castellano</a></nav>
+<h1 id="findings">Findings</h1>
+<p>What turned up when the cartridge was taken apart. Every number here is measured: by running the cartridge&#x27;s own routines, or by dumping the emulator&#x27;s memory and comparing it byte for byte.</p>
+<h2 id="the-collision-map-is-the-screen-itself">The collision map is the screen itself</h2>
+<p>This cartridge stores nowhere where the road actually is. To find out whether the car has touched the verge it <b>reads the screen</b>. The routine at 0x6D8B works out the cell the car is in, asks the VDP for it with <code>SETRD</code> and pulls back, with a single <code>in a,(c)</code>, whatever tile is drawn there.</p>
+<p>Then it sorts it into bands:</p>
+<table><tr><th>tile</th><th>what it means</th></tr><tr><td>below 0xCF</td><td>certain crash</td></tr><tr><td>0xCF to 0xD8</td><td>clear</td></tr><tr><td>0xD9 to 0xE8</td><td>the verge, and it needs pixel-level checking</td></tr></table>
+<p>It is the cheapest way to make the car hit <b>what you can see</b>, whatever the road happened to paint there. And it explains why the verge trail exists at all: for what is <em>not</em> on screen -where to reappear, where to drop an object- separate memory is still needed.</p>
+<h2 id="a-routine-hidden-inside-its-own-pointer-table">A routine hidden inside its own pointer table</h2>
+<p>0x5540 does <code>call 05716h</code>, and 0x5716 lands <b>inside</b> the scenery pointer table at 0x570C: it is its last two bytes.</p>
+<p>Konami uses them for two things at once. Read as a word they are the table&#x27;s sixth entry. Executed they are the <code>ld hl,(0e046h)</code> that starts the routine which advances the ring:</p>
+<pre><code>ld hl,(0e046h)      where the ring is being read from
+ld bc,0ffeah        twenty-two back: one row
+add hl,bc
+ld (0e046h),hl
+ld bc,0e170h        0xE186 - 22, that is, before the start
+and a / sbc hl,bc
+jr nz,+6
+ld hl,0e380h        and then to 0xE380, which plus 22 gives 0xE396
+ld (0e046h),hl
+ld de,(0e046h) / ld hl,0e058h / ld bc,00016h / ldir</code></pre>
+<p>The giveaway is that the sixth entry would point at 0x462A, and 0x462A is a <code>jr</code> inside the RLE decompressor: no scenery artwork at all. The table has <b>five</b> entries, and what follows is already code.</p>
+<p>These thirty-six bytes spent the whole disassembly classified as data nobody reads. The proof that they are code is not that they can be disassembled: it is that, declared as such, <b>the listing still gives back the ROM byte for byte</b>.</p>
+<h2 id="the-two-builds-differ-by-one-byte">The two builds differ by ONE byte</h2>
+<p>Two dumps of this cartridge are in circulation. They differ by <b>a single byte, 0x53CB</b>: one has 0x05, the other 0xFF.</p>
+<p>That byte is the fifteenth segment of the <b>stage 5</b> row in the plan at 0x537D, which is six rows of sixteen bytes each closed with 0xFF and padded with 0xFF to the end.</p>
+<p>Measured in openMSX, forcing (0xE043) to 5 and placing the segment pointer at the end of that row:</p>
+<pre><code>with 0x05   ... plan+13 seg=0x0A -&gt; plan+14 seg=0x05 -&gt; plan+0 (wraps)
+with 0xFF   ... plan+13 seg=0x0A -&gt;                     plan+0 (wraps)</code></pre>
+<p>So: the 0x05 version plays <b>fifteen</b> segments per cycle and the 0xFF one, <b>fourteen</b>. The one that vanishes is segment 5, whose record at 0x5329 is <code>00 04 18 08 08 28</code>.</p>
+<p><b>Which of the two plays harder is not claimed here, because it has not been measured.</b> The &quot;Easy&quot; and &quot;Hard&quot; labels they circulate under come from the dump, not from the ROM.</p>
+<h2 id="the-car-has-a-dead-band-of-speed">The car has a dead band of speed</h2>
+<p>Under acceleration the car moves up the screen by 0x48 of 256 of a pixel per frame. But not always: the routine at 0x6C93 only lets it move in two speed bands, with a third in between where it stays put.</p>
+<table><tr><th>speed</th><th>does it move?</th></tr><tr><td>below 0x18</td><td>no</td></tr><tr><td>0x18 to 0x50</td><td>yes</td></tr><tr><td>0x50 to 0x7E</td><td><b>no</b></td></tr><tr><td>above 0x7E</td><td>yes</td></tr></table>
+<p>Measured, not inferred. Across 900 frames of the attract mode the car&#x27;s Y sits still at 0x8FC0 while the speed climbs from 0x51 to 0x7D, and starts moving again the moment it passes 0x7E. 57 of the 58 comparable frames match the prediction, and the one that does not falls exactly on the boundary between two samples.</p>
+<p>The same measurement yields two more things: the code&#x27;s caps are genuinely reached -the Y locks at 0x9A and the speed at 0xD7- and <b>the attract mode runs with the accelerator held down</b>, releasing it for one frame in every 104.</p>
+<h2 id="three-marks-nine-apart">Three marks nine apart</h2>
+<p>The end of a stage is not one moment. It is three, nine units of distance apart, which is nine ring rows:</p>
+<table><tr><th>distance</th><th>what happens</th></tr><tr><td>0x0F00</td><td>the rival car is released</td></tr><tr><td>0x0F09</td><td>the finish sign is painted into the ring</td></tr><tr><td>0x0F12</td><td>the car crosses it: state 3, and effect 0x92 sounds</td></tr></table>
+<p>And the sign is not always the same. The first five stages get the eleven tiles of <code>CHECK POINT</code>; the sixth, the five of <code>GOAL</code>, three columns further right. They read with the same rule as every other text in the cartridge -the pattern index is the ASCII code minus 0x20- and they were confirmed by <b>drawing their tiles</b> from the emulator&#x27;s VRAM, not by assuming it.</p>
+<p>The same trick applies to the <code>EMPTY</code> warning at 0x6B59, which is written over the road itself when the fuel runs out, and which shifts left if it would not fit within the ring&#x27;s twenty-two columns.</p>
+<h2 id="the-symmetrical-road-comes-free">The symmetrical road comes free</h2>
+<p>Stage 3 draws the whole row from a single sixteen-bit word: each bit picks one of two tiles. Twelve columns are asked for and then ten more, but the second call reloads the same word from the start, because the pointer has not moved.</p>
+<p>Columns 12 to 21 repeat the pattern of the first ten. The road comes out symmetrical without spending one extra byte or one extra instruction.</p>
+<h2 id="the-level-changes-four-things-not-one">The level changes four things, not one</h2>
+<p>LEVEL A and LEVEL B are not a difficulty multiplier. The level, at (0xE03B), is consulted in four places with nothing to do with each other: the sideways push on objects (0x706D), the fuel burn (0x7374), the object spawn delay (0x6F72) and the segment list, where the first level <b>removes an entire segment</b>, swapping 0x0A for 9 (0x7044).</p>
+<h2 id="what-the-cartridge-saves">What the cartridge saves</h2>
+<p>A handful of tricks that turn up again and again:</p>
+<ul><li><b>The scene step is not compared</b>: it is spent with chained <code>djnz</code>.</li><li><b>The tables sit right behind the <code>call</code></b>, and the dispatcher recovers its own return address with a <code>pop hl</code> to read them. There are six.</li><li><b><code>L_440C</code> eats its caller&#x27;s return address</b> when its count does not reach zero, which is a two-level return in three instructions.</li><li><b>The lane markings are bitmaps</b>: twelve bits per word, each bit picking one of two tiles.</li><li><b>The patches chain</b>: every call to the paster inherits the destination the previous one left, and sometimes only register E changes.</li></ul>
+<h2 id="konami-s-hidden-mark">Konami&#x27;s hidden mark</h2>
+<p>The last fifteen bytes of the cartridge are read by nobody: they are <code>RC-730</code> and the title in katakana, ロードファイター, written backwards and closed with the length -ten bytes-, the two RC digits in BCD and an 0xAA.</p>
+<p>The format of that signature was discovered by <b>Manuel Pazos</b>, and without his find these fifteen bytes would have stayed filed under &quot;data nobody reads&quot;. Our thanks.</p>
+<footer><p><em>Road Fighter</em> was published by Konami for the MSX in 1985; its catalogue number is RC-730 and it is 16 KB. All rights in the game remain with their holders. This is preservation, study and documentation work, and the cartridge image is not distributed.</p></footer></div>
