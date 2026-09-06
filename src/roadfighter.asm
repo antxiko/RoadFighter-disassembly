@@ -3210,7 +3210,7 @@ L_55AB:
 	ld (0e08ah),bc		;55af
 
 ; ----------------------------------------------------------------------
-; El puente propiamente dicho: cuatro columnas del guion, SEIS de tile 0xD0 en medio y otras cuatro del guion. Y dos filas de cada cuatro llevan un 0xD1 en la columna 11, que es la raya discontinua del centro de la calzada.
+; El puente propiamente dicho: cuatro columnas del guion, SIETE de tile 0xD0 en medio y otras cuatro del guion, de la columna 4 a la 18. Las siete del centro no se escriben una a una: se pone el 0xD0 en la primera y un `ldir` que se solapa consigo mismo lo arrastra hasta el final, que es por lo que son siete y no las seis que dice el `ld c,006h`. Y dos filas de cada cuatro llevan un 0xD1 en la columna 11, la raya discontinua del centro.
 ; ----------------------------------------------------------------------
 L_55B3:
 	ld de,0e05ch		;55b3   ; la columna 4 de la fila nueva
@@ -3218,14 +3218,14 @@ L_55B3:
 	ld hl,(0e06fh)		;55b9   ; el guion
 	ldir		;55bc
 	push hl			;55be
-	ld c,006h		;55bf   ; seis mas
+	ld c,006h		;55bf   ; seis mas, que con el que ya esta puesto hacen siete
 	ld h,d			;55c1
 	ld l,e			;55c2
 	ld (hl),0d0h		;55c3   ; el tile del centro del puente
 	inc de			;55c5
-	ldir		;55c6   ; repetido
+	ldir		;55c6   ; el `ldir` se pisa a si mismo y lo arrastra
 	pop hl			;55c8
-	ld c,004h		;55c9   ; y otras cuatro del guion
+	ld c,004h		;55c9   ; y otras cuatro del guion, desde la columna 15
 	ldir		;55cb
 	ld (0e06fh),hl		;55cd   ; ahi queda el guion
 	ld hl,0e08ch		;55d0   ; la cuenta de filas
@@ -3758,10 +3758,10 @@ L_58BF:
 	inc hl			;58d7
 	ld h,(hl)			;58d8
 	ld l,a			;58d9
-	ld b,(hl)			;58da   ; lo ancho que es
+	ld b,(hl)			;58da   ; las veces que se repite: `ld (nn),bc` guarda C delante, asi que B acaba en (0xE086)
 	inc hl			;58db
-	ld c,(hl)			;58dc   ; y cuantas veces se repite
-	ld (0e085h),bc		;58dd   ; los dos juntos
+	ld c,(hl)			;58dc   ; y lo ancho que es, que es lo que acaba en (0xE085)
+	ld (0e085h),bc		;58dd   ; los dos de golpe, y cruzados
 	inc hl			;58e1
 	ld (0e087h),hl		;58e2   ; y ahi empiezan sus filas
 	jr L_58EC		;58e5
