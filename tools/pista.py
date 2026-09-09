@@ -512,6 +512,18 @@ def dibuja(rom, etapa, filas, ruta, zoom=2):
     Los colores salen del decorado de ESA etapa, que monta escena_juego, y
     cada celda se pinta con pinta_celda -la misma de graficos.py- para que el
     reparto en tres tercios de SCREEN 2 salga igual que en la pantalla.
+
+    LA PRIMERA FILA VA ABAJO, y esto no es una preferencia. El generador las
+    saca en el orden en que entran en la pantalla, o sea de la salida hacia
+    adelante, y en este juego se avanza hacia ARRIBA: las filas nuevas asoman
+    por el borde de arriba. Apilando la fila 0 arriba, el mapa sale volcado y
+    todo lo que ocupa mas de una fila queda del reves -los tejados debajo de
+    su fachada, la piscina encima de su casa y el rotulo de Konami, que esta
+    en la linea de salida, en el otro extremo de la tira-.
+
+    Lo destapo theNestruo (issue #1) y se publico mal. El tercio de SCREEN 2
+    sigue saliendo del indice de la fila EN EL MAPA, no de donde acabe pintada:
+    es lo que decide sus colores y no cambia por darle la vuelta a la tira.
     """
     v = escena_juego(rom, etapa)
     usa_fondo(0)                              # R7 = 0xE0 en marcha: fondo negro
@@ -520,7 +532,7 @@ def dibuja(rom, etapa, filas, ruta, zoom=2):
     for f, fila in enumerate(filas):
         for c, tile in enumerate(fila):
             # el tercio es el de la fila de PANTALLA en la que caeria
-            pinta_celda_en(v, f, c, tile, pix, ancho, f % 24)
+            pinta_celda_en(v, alto - 1 - f, c, tile, pix, ancho, f % 24)
     png(pix, ancho, alto * 8, ruta, zoom)
 
 

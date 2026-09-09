@@ -50,6 +50,12 @@ cartridge's road engine** in Python, routine by routine, and checked against
 openMSX: across the 264 steps compared -forty-four per stage- the entire
 528-byte ring and every generator variable came out identical to the machine's.
 
+**They read from the bottom up**, which is how they are driven: the starting
+line and the Konami sign sit at the foot of the strip, the goal at the very top.
+The engine emits rows in the order they appear over the top edge of the screen,
+so stacking them the other way round would leave everything taller than one row
+upside down -the fir trees in stage six, for one-.
+
 ### Stage 1
 
 ![Stage 1](imagenes/pista_1.png)

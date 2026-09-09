@@ -98,6 +98,7 @@ audio{display:block;width:100%;max-width:640px;margin:.75rem 0 1.5rem}
 <p>The start screen comes from no list and no map. The routine at 0x77C8 builds it by hand: first it fills the whole ring with grass using an <code>lddr</code> of 0x225 bytes, then it pastes eight patches one after another, each call inheriting the destination the previous one left behind. That is why sometimes only register E changes between one and the next.</p>
 <h2 id="the-six-roads">The six roads</h2>
 <p>None of these pictures is a capture. They are drawn by <b>running the cartridge&#x27;s road engine</b> in Python, routine by routine, and checked against openMSX: across the 264 steps compared -forty-four per stage- the entire 528-byte ring and every generator variable came out identical to the machine&#x27;s.</p>
+<p><b>They read from the bottom up</b>, which is how they are driven: the starting line and the Konami sign sit at the foot of the strip, the goal at the very top. The engine emits rows in the order they appear over the top edge of the screen, so stacking them the other way round would leave everything taller than one row upside down -the fir trees in stage six, for one-.</p>
 <h3 id="stage-1">Stage 1</h3>
 <p><img src="imagenes/pista_1.png" alt="Stage 1"></p>
 <p>Houses with their hedges, the swimming pool, parked cars, the tennis courts and a Konami billboard near the top.</p>

@@ -52,6 +52,12 @@ openMSX: en los 264 pasos cotejados —cuarenta y cuatro por etapa— el anillo
 entero de 528 bytes y todas las variables del generador salieron idénticos a
 los de la máquina.
 
+**Se leen de abajo arriba**, que es como se recorren: la línea de salida y el
+rótulo de Konami están al pie de la tira, y la meta arriba del todo. El motor
+saca las filas en el orden en que asoman por el borde superior de la pantalla,
+así que apilarlas al revés dejaría boca abajo todo lo que ocupa más de una fila
+—los abetos de la sexta etapa, sin ir más lejos—.
+
 ### Etapa 1
 
 ![Etapa 1](../imagenes/pista_1.png)
