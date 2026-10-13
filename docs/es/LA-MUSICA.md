@@ -6,13 +6,15 @@ Todo lo que suena aquí sale de ejecutar el motor de sonido del cartucho (`latid
 
 Las escrituras al PSG se han comparado cuadro a cuadro con las de openMSX (C-BIOS MSX1 japonés). En todos los cuadros el PSG queda igual:
 
-- la pieza 0x98 entera, 218 cuadros, tal como el juego la pide.
+- la pieza 0x98 entera, 218 cuadros, tal como el juego la pide;
+- la pieza 0x95 entera, 198 cuadros, pedida a la fuerza;
+- los primeros 270 cuadros de cruzar la meta (0x92, que dura 346), hasta que el juego pide otro sonido encima.
 
 El timbre no está cotejado: es el de un AY-3-8910 de manual, no una grabación del emulador. Las sondas están en `tools/omsx_psg.tcl` y `tools/coteja_psg.py`.
 
 ## Cómo se pide una pieza
 
-`suena` recibe el número en A y `pide_efecto` elige la voz: el número más bajo manda. Los números por debajo de 0x0F son efectos de una o dos voces y del 0x0F en adelante hay música de tres. Cada voz ocupa once bytes desde 0xE010 y 0xE031 guarda la copia del mezclador del PSG, que el arranque deja en 0xB8. Las pistas «de la tabla» están en la tabla de melodías (0x4DE0) pero ninguna rutina las pide con un `ld a`. Solo hay una pieza cotejada con openMSX, la 0x98; las demás salen del mismo motor, pero no se ha comparado cada una.
+`suena` recibe el número en A y `pide_efecto` elige la voz: el número más bajo manda. Los números por debajo de 0x0F son efectos de una o dos voces y del 0x0F en adelante hay música de tres. Cada voz ocupa once bytes desde 0xE010 y 0xE031 guarda la copia del mezclador del PSG, que el arranque deja en 0xB8. Las pistas «de la tabla» están en la tabla de melodías (0x4DE0) pero ninguna rutina las pide con un `ld a`. Hay tres piezas cotejadas con openMSX, la 0x98, la 0x95 y la 0x92 (esta en sus 270 primeros cuadros); las demás salen del mismo motor, pero no se ha comparado cada una.
 
 ## Las músicas
 

@@ -6,13 +6,15 @@ Everything you hear here comes from running the cartridge's own sound engine (`l
 
 The PSG writes have been compared frame by frame with those of openMSX (C-BIOS MSX1 japonés). In every frame the PSG ends up the same:
 
-- tune 0x98, whole, 218 frames, as the game asks for it.
+- tune 0x98, whole, 218 frames, as the game asks for it;
+- tune 0x95, whole, 198 frames, forced;
+- the first 270 frames of crossing the finish line (0x92, which lasts 346), until the game asks for another sound on top.
 
 The timbre is not checked: it is a textbook AY-3-8910, not a recording of the emulator. The probes are `tools/omsx_psg.tcl` and `tools/coteja_psg.py`.
 
 ## How a piece is asked for
 
-`suena` takes the number in A and `pide_efecto` picks the voice: the lowest number wins. Numbers below 0x0F are one- or two-voice effects and from 0x0F up there is three-voice music. Each voice takes eleven bytes from 0xE010 and 0xE031 holds the copy of the PSG mixer, which start-up leaves at 0xB8. The tracks marked «in the table» are in the melody table (0x4DE0) but no routine asks for them with an `ld a`. Only one piece has been checked against openMSX, 0x98; the rest come out of the same engine but each has not been compared.
+`suena` takes the number in A and `pide_efecto` picks the voice: the lowest number wins. Numbers below 0x0F are one- or two-voice effects and from 0x0F up there is three-voice music. Each voice takes eleven bytes from 0xE010 and 0xE031 holds the copy of the PSG mixer, which start-up leaves at 0xB8. The tracks marked «in the table» are in the melody table (0x4DE0) but no routine asks for them with an `ld a`. Three pieces have been checked against openMSX, 0x98, 0x95 and 0x92 (the last in its first 270 frames); the rest come out of the same engine but each has not been compared.
 
 ## The tunes
 
